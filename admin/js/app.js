@@ -2925,311 +2925,6 @@
 		}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
 	}
 
-	/* ---------- Rede de Palavras-chave (canvas, estilo rede neural) ---------- */
-	var Network = { raf: null, nodes: [], edges: [], canvas: null, ctx: null };
-
-	function networkColor(clusterId) {
-		var hue = clusterId ? ( (clusterId * 63) % 360 ) : 210;
-		return { hue: hue, glow: 'hsl(' + hue + ',85%,64%)', core: 'hsl(' + hue + ',95%,80%)', edge: 'hsla(' + hue + ',80%,60%,' };
-	}
-
-	function renderNetwork() {
-		var el = $('#ce-panel-network');
-		el.innerHTML = '<div class="ce-loading">Carregando a rede</div>';
-		api('keyword_network', {}).then(function (d) {
-			if (!d.nodes.length) {
-				el.innerHTML = '<div class="ce-empty"><h3>Ainda não há rede para mostrar</h3><p>Rode o scan no Painel para o plugin mapear os posts e os links internos entre eles.</p></div>';
-				return;
-			}
-			el.innerHTML =
-				'<div class="ce-net-wrap">' +
-					'<div class="ce-net-toolbar">' +
-						'<input class="ce-net-search" id="ce-net-search" placeholder="Buscar por título ou keyword…">' +
-						'<span class="ce-net-legend"><i class="ce-net-dot"></i> tamanho = links recebidos · cor = cluster · anel brilhante = pilar</span>' +
-						'<span class="ce-net-count">' + d.nodes.length + ' artigos · ' + d.edges.length + ' links</span>' +
-					'</div>' +
-					'<div class="ce-net-canvas-box" id="ce-net-box">' +
-						'<canvas id="ce-net-canvas"></canvas>' +
-						'<div class="ce-net-tooltip" id="ce-net-tip" hidden></div>' +
-					'</div>' +
-				'</div>';
-			initNetwork(d.nodes, d.edges);
-		}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
-	}
-
-	function initNetwork(rawNodes, rawEdges) {
-		if (Network.raf) { cancelAnimationFrame(Network.raf); }
-		var box = $('#ce-net-box');
-		var canvas = $('#ce-net-canvas');
-		var tip = $('#ce-net-tip');
-		var ctx = canvas.getContext('2d');
-		var W = 0, H = 0, DPR = Math.max(1, window.devicePixelRatio || 1);
-
-		function resize() {
-			W = box.clientWidth; H = box.clientHeight;
-			canvas.width = W * DPR; canvas.height = H * DPR;
-			canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-			ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-		}
-		resize();
-		window.addEventListener('resize', resize);
-
-		// Grau de conexão por nó (para raio e para destacar vizinhos no hover).
-		var degree = {};
-		rawEdges.forEach(function (e) { degree[e.a] = (degree[e.a] || 0) + 1; degree[e.b] = (degree[e.b] || 0) + 1; });
-		var maxDeg = Math.max(1, Math.max.apply(null, rawNodes.map(function (n) { return degree[n.id] || 0; })));
-
-		var byId = {};
-		var nodes = rawNodes.map(function (n) {
-			var ang = Math.random() * Math.PI * 2, rad = 60 + Math.random() * 260;
-			var deg = degree[n.id] || 0;
-			var node = {
-				id: n.id, title: n.title, keyword: n.keyword, cluster: n.cluster, cname: n.cname,
-				pillar: n.pillar, edit: n.edit, view: n.view,
-				x: W / 2 + Math.cos(ang) * rad, y: H / 2 + Math.sin(ang) * rad,
-				vx: 0, vy: 0,
-				r: 5 + Math.min(16, (deg / maxDeg) * 16) + (n.pillar ? 4 : 0),
-				deg: deg,
-				color: networkColor(n.cluster),
-				phase: Math.random() * Math.PI * 2,
-				pinned: false
-			};
-			byId[n.id] = node;
-			return node;
-		});
-		var edges = rawEdges.map(function (e) { return { a: byId[e.a], b: byId[e.b], w: e.w }; }).filter(function (e) { return e.a && e.b; });
-		var neighbors = {};
-		edges.forEach(function (e) {
-			(neighbors[e.a.id] = neighbors[e.a.id] || []).push(e.b.id);
-			(neighbors[e.b.id] = neighbors[e.b.id] || []).push(e.a.id);
-		});
-
-		Network.nodes = nodes; Network.edges = edges;
-
-		// ---- Física simples: repulsão entre todos os pares + mola nas arestas + centralização ----
-		var settling = true, tick = 0;
-		function step(dt) {
-			var cx = W / 2, cy = H / 2;
-			var n = nodes.length;
-			for (var i = 0; i < n; i++) {
-				var a = nodes[i];
-				if (a.pinned) { continue; }
-				var fx = (cx - a.x) * 0.0025, fy = (cy - a.y) * 0.0025;
-				for (var j = 0; j < n; j++) {
-					if (i === j) { continue; }
-					var b = nodes[j];
-					var dx = a.x - b.x, dy = a.y - b.y;
-					var d2 = dx * dx + dy * dy + 0.01;
-					var f = 900 / d2;
-					fx += dx * f; fy += dy * f;
-				}
-				a.vx = (a.vx + fx * dt) * 0.86;
-				a.vy = (a.vy + fy * dt) * 0.86;
-			}
-			edges.forEach(function (e) {
-				var dx = e.b.x - e.a.x, dy = e.b.y - e.a.y;
-				var dist = Math.sqrt(dx * dx + dy * dy) || 1;
-				var target = 90;
-				var f = (dist - target) * 0.02 * e.w;
-				var ux = dx / dist, uy = dy / dist;
-				if (!e.a.pinned) { e.a.vx += ux * f * dt; e.a.vy += uy * f * dt; }
-				if (!e.b.pinned) { e.b.vx -= ux * f * dt; e.b.vy -= uy * f * dt; }
-			});
-			nodes.forEach(function (a) {
-				if (a.pinned) { return; }
-				a.x += a.vx * dt; a.y += a.vy * dt;
-				a.x = Math.max(a.r + 4, Math.min(W - a.r - 4, a.x));
-				a.y = Math.max(a.r + 4, Math.min(H - a.r - 4, a.y));
-			});
-		}
-
-		var hoverNode = null, dragNode = null, dragging = false;
-		var view = { scale: 1, ox: 0, oy: 0 };
-		var searchTerm = '';
-
-		function toWorld(px, py) {
-			return { x: (px - view.ox) / view.scale, y: (py - view.oy) / view.scale };
-		}
-
-		function draw(time) {
-			ctx.clearRect(0, 0, W, H);
-			ctx.fillStyle = '#0A0E1F';
-			ctx.fillRect(0, 0, W, H);
-			// leve textura de "estrelas" fixas
-			ctx.save();
-			ctx.globalAlpha = 0.35;
-			ctx.fillStyle = '#2547F4';
-			for (var s = 0; s < 40; s++) {
-				var sx = (s * 97) % W, sy = (s * 53) % H;
-				ctx.fillRect(sx, sy, 1, 1);
-			}
-			ctx.restore();
-
-			ctx.save();
-			ctx.translate(view.ox, view.oy);
-			ctx.scale(view.scale, view.scale);
-
-			var activeIds = null;
-			if (hoverNode) {
-				activeIds = {};
-				activeIds[hoverNode.id] = true;
-				(neighbors[hoverNode.id] || []).forEach(function (id) { activeIds[id] = true; });
-			}
-
-			// arestas
-			edges.forEach(function (e) {
-				var dim = activeIds && !(activeIds[e.a.id] && activeIds[e.b.id]);
-				var hot = activeIds && activeIds[e.a.id] && activeIds[e.b.id];
-				ctx.strokeStyle = e.a.color.edge + (dim ? '0.05' : (hot ? '0.9' : '0.22')) + ')';
-				ctx.lineWidth = (e.w === 2 ? 1.6 : 0.9) * (hot ? 1.8 : 1);
-				ctx.beginPath();
-				ctx.moveTo(e.a.x, e.a.y);
-				ctx.lineTo(e.b.x, e.b.y);
-				ctx.stroke();
-			});
-
-			// nós
-			nodes.forEach(function (a) {
-				var dim = activeIds && !activeIds[a.id];
-				var matched = !searchTerm || (a.title.toLowerCase().indexOf(searchTerm) > -1 || (a.keyword || '').toLowerCase().indexOf(searchTerm) > -1);
-				var pulse = 0.75 + 0.25 * Math.sin(time / 700 + a.phase);
-				var alpha = dim ? 0.12 : (matched ? 1 : 0.10);
-				var r = a === hoverNode ? a.r * 1.35 : a.r;
-
-				ctx.save();
-				ctx.globalAlpha = alpha;
-				var grad = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, r * 2.4);
-				grad.addColorStop(0, a.color.glow);
-				grad.addColorStop(1, 'transparent');
-				ctx.fillStyle = grad;
-				ctx.globalAlpha = alpha * pulse * 0.55;
-				ctx.beginPath(); ctx.arc(a.x, a.y, r * 2.4, 0, Math.PI * 2); ctx.fill();
-
-				ctx.globalAlpha = alpha;
-				ctx.beginPath();
-				ctx.fillStyle = a.color.core;
-				ctx.arc(a.x, a.y, r, 0, Math.PI * 2);
-				ctx.fill();
-				if (a.pillar) {
-					ctx.lineWidth = 2;
-					ctx.strokeStyle = '#ffffff';
-					ctx.globalAlpha = alpha * 0.9;
-					ctx.beginPath(); ctx.arc(a.x, a.y, r + 3, 0, Math.PI * 2); ctx.stroke();
-				}
-				ctx.restore();
-			});
-
-			ctx.restore();
-		}
-
-		var last = performance.now();
-		function loop(now) {
-			if (!$('#ce-panel-network') || !$('#ce-panel-network').classList.contains('is-active')) {
-				Network.raf = null;
-				return;
-			}
-			var dt = Math.min(2, (now - last) / 16.6); last = now;
-			tick++;
-			if (settling && tick > 220) { settling = false; }
-			step(settling ? dt * 1.4 : dt * 0.35);
-			draw(now);
-			Network.raf = requestAnimationFrame(loop);
-		}
-		Network.raf = requestAnimationFrame(loop);
-
-		// ---- Interação: hover, clique, arrastar, zoom, pan ----
-		function nodeAt(px, py) {
-			var w = toWorld(px, py);
-			var best = null, bd = 999999;
-			nodes.forEach(function (a) {
-				var dx = a.x - w.x, dy = a.y - w.y;
-				var d = dx * dx + dy * dy;
-				var rr = (a.r + 6) * (a.r + 6);
-				if (d < rr && d < bd) { bd = d; best = a; }
-			});
-			return best;
-		}
-
-		canvas.addEventListener('mousemove', function (e) {
-			var rect = canvas.getBoundingClientRect();
-			var px = e.clientX - rect.left, py = e.clientY - rect.top;
-			if (dragging && dragNode) {
-				var w = toWorld(px, py);
-				dragNode.x = w.x; dragNode.y = w.y; dragNode.vx = 0; dragNode.vy = 0;
-				return;
-			}
-			if (panning) {
-				view.ox = panStart.ox + (px - panStart.px);
-				view.oy = panStart.oy + (py - panStart.py);
-				return;
-			}
-			var hit = nodeAt(px, py);
-			hoverNode = hit;
-			if (hit) {
-				tip.hidden = false;
-				tip.textContent = hit.title + (hit.keyword ? ' — ' + hit.keyword : '');
-				tip.style.left = Math.min(W - 20, px + 14) + 'px';
-				tip.style.top = Math.max(0, py - 10) + 'px';
-				canvas.style.cursor = 'pointer';
-			} else {
-				tip.hidden = true;
-				canvas.style.cursor = panning ? 'grabbing' : 'grab';
-			}
-		});
-
-		var panning = false, panStart = null;
-		canvas.addEventListener('mousedown', function (e) {
-			var rect = canvas.getBoundingClientRect();
-			var px = e.clientX - rect.left, py = e.clientY - rect.top;
-			var hit = nodeAt(px, py);
-			if (hit) {
-				dragNode = hit; dragging = true; dragNode.pinned = true;
-			} else {
-				panning = true; panStart = { px: px, py: py, ox: view.ox, oy: view.oy };
-			}
-		});
-		window.addEventListener('mouseup', function () {
-			if (dragNode) { dragNode.pinned = false; }
-			dragging = false; dragNode = null; panning = false;
-		});
-		canvas.addEventListener('click', function (e) {
-			if (Math.abs((dragStartPos && dragStartPos.moved) || 0) > 4) { return; }
-			var rect = canvas.getBoundingClientRect();
-			var hit = nodeAt(e.clientX - rect.left, e.clientY - rect.top);
-			if (hit) {
-				modal(
-					'<h3 class="ce-h2">' + esc(hit.title) + '</h3>' +
-					(hit.cname ? '<p class="ce-sub">Cluster: ' + esc(hit.cname) + (hit.pillar ? ' · <span class="ce-chip ce-chip-pillar">PILAR</span>' : '') + '</p>' : '') +
-					(hit.keyword ? '<p><span class="ce-chip ce-chip-kw">' + esc(hit.keyword) + '</span></p>' : '') +
-					'<p class="ce-sub">' + hit.deg + ' conexões nesta rede</p>' +
-					'<p style="margin-top:14px"><a class="ce-btn ce-btn-primary" href="' + esc(hit.edit) + '" target="_blank" rel="noopener">Editar</a> ' +
-					'<a class="ce-btn ce-btn-ghost" href="' + esc(hit.view) + '" target="_blank" rel="noopener">Visualizar</a></p>'
-				);
-			}
-		});
-		var dragStartPos = null;
-		canvas.addEventListener('mousedown', function (e) { dragStartPos = { x: e.clientX, y: e.clientY, moved: 0 }; });
-		canvas.addEventListener('mousemove', function (e) {
-			if (dragStartPos) { dragStartPos.moved = Math.abs(e.clientX - dragStartPos.x) + Math.abs(e.clientY - dragStartPos.y); }
-		});
-
-		canvas.addEventListener('wheel', function (e) {
-			e.preventDefault();
-			var rect = canvas.getBoundingClientRect();
-			var px = e.clientX - rect.left, py = e.clientY - rect.top;
-			var before = toWorld(px, py);
-			var delta = e.deltaY < 0 ? 1.1 : 0.9;
-			view.scale = Math.max(0.3, Math.min(3, view.scale * delta));
-			view.ox = px - before.x * view.scale;
-			view.oy = py - before.y * view.scale;
-		}, { passive: false });
-
-		var searchInput = $('#ce-net-search');
-		if (searchInput) {
-			searchInput.addEventListener('input', function () { searchTerm = this.value.trim().toLowerCase(); });
-		}
-	}
-
 	/* ---------- Rede de Palavras-chave (canvas, estética de rede neural) ---------- */
 	var netState = null; // estado vivo do grafo enquanto a aba está ativa.
 
@@ -3260,6 +2955,12 @@
 				'<div class="ce-net-wrap" id="ce-net-wrap">' +
 					'<canvas id="ce-net-canvas"></canvas>' +
 					'<div class="ce-net-tip" id="ce-net-tip" hidden></div>' +
+					'<div class="ce-net-zoom" role="group" aria-label="Zoom da rede">' +
+						'<button type="button" class="ce-net-zbtn" id="ce-net-zin" aria-label="Aproximar" title="Aproximar">+</button>' +
+						'<button type="button" class="ce-net-zbtn" id="ce-net-zout" aria-label="Afastar" title="Afastar">\u2212</button>' +
+						'<button type="button" class="ce-net-zbtn" id="ce-net-zfit" aria-label="Ajustar à tela" title="Ajustar à tela">\u2922</button>' +
+					'</div>' +
+					'<div class="ce-net-hint" id="ce-net-hint">Ctrl + scroll para zoom · arraste para mover</div>' +
 				'</div>';
 			netState = initNetwork(d.nodes, d.edges);
 		}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
@@ -3509,16 +3210,23 @@
 		function onDownWrap(e) { movedSinceDown = false; onDown(e); }
 		function onMoveWrap(e) { movedSinceDown = true; onMove(e); }
 
-		function onWheel(e) {
-			e.preventDefault();
-			var rect = canvas.getBoundingClientRect();
-			var px = e.clientX - rect.left, py = e.clientY - rect.top;
+		// Zoom mantendo estável o ponto (px, py) em coordenadas do canvas.
+		function zoomAt(factor, px, py) {
 			var before = toWorld(px, py);
-			var delta = e.deltaY > 0 ? 0.9 : 1.1;
-			view.scale = Math.max(0.25, Math.min(3, view.scale * delta));
+			view.scale = Math.max(0.25, Math.min(3, view.scale * factor));
 			var after = toWorld(px, py);
 			view.x += (after.x - before.x) * view.scale;
 			view.y += (after.y - before.y) * view.scale;
+		}
+
+		function onWheel(e) {
+			// Só dá zoom com Ctrl/⌘ segurado; caso contrário deixa a página rolar normalmente.
+			if (!(e.ctrlKey || e.metaKey)) { return; }
+			e.preventDefault();
+			var rect = canvas.getBoundingClientRect();
+			// Fator exponencial proporcional ao delta: suave no wheel e no trackpad.
+			var factor = Math.pow(1.0015, -e.deltaY);
+			zoomAt(factor, e.clientX - rect.left, e.clientY - rect.top);
 		}
 
 		function openNodeModal(nd) {
@@ -3537,6 +3245,12 @@
 		window.addEventListener('mouseup', onUp);
 		canvas.addEventListener('wheel', onWheel, { passive: false });
 		canvas.addEventListener('mouseleave', function () { hovered = null; tip.hidden = true; });
+
+		// Botões de zoom na tela (aproximam/afastam a partir do centro do canvas).
+		var zin = $('#ce-net-zin'), zout = $('#ce-net-zout'), zfit = $('#ce-net-zfit');
+		if (zin) { zin.addEventListener('click', function () { zoomAt(1.2, W / 2, H / 2); }); }
+		if (zout) { zout.addEventListener('click', function () { zoomAt(1 / 1.2, W / 2, H / 2); }); }
+		if (zfit) { zfit.addEventListener('click', function () { fitView(); }); }
 
 		var searchInput = $('#ce-net-search');
 		if (searchInput) {

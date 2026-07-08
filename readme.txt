@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.5.0
+Stable tag: 2.5.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.5.2 =
+* Melhorado: zoom da Rede de Palavras-chave mais fluido — botões na tela (aproximar, afastar e "ajustar à tela") e zoom proporcional/suave no wheel e trackpad.
+* Corrigido: o scroll do mouse não sequestra mais a rolagem da página sobre o grafo; o zoom por scroll agora exige Ctrl/⌘ segurado.
 
 = 2.5.0 =
 * Novo: planejamento de cluster com briefing editorial — ao clicar em "Planejar conteúdo (IA)", escolha o número de artigos e a profundidade (~800/1200/2000/3000 palavras, com H2 correspondentes); a IA monta, para cada artigo, um briefing com FAQs e subtemas sugeridos (baseado no conhecimento do modelo — não é busca ao vivo no Google, deixado claro na interface).
