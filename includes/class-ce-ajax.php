@@ -28,6 +28,7 @@ class CE61_Ajax {
 			'performance_history', 'performance_insight', 'performance_insight_save', 'performance_insight_list', 'performance_insight_delete',
 			'google_status', 'google_disconnect', 'google_list_sites', 'google_list_ga4', 'google_test_gsc', 'google_test_ga4',
 			'keyword_network',
+			'cpt_list', 'cpt_toggle', 'cpt_generate',
 		);
 		foreach ( $actions as $a ) {
 			add_action( 'wp_ajax_ce61_' . $a, array( __CLASS__, $a ) );
@@ -1530,6 +1531,64 @@ class CE61_Ajax {
 			$publish = 'draft';
 		}
 		$payload = array(
+			'cluster_id'    => isset( $_POST['cluster_id'] ) ? absint( $_POST['cluster_id'] ) : 0,
+			'title'         => isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '',
+			'keyword'       => isset( $_POST['keyword'] ) ? sanitize_text_field( wp_unslash( $_POST['keyword'] ) ) : '',
+			'custom_prompt' => isset( $_POST['custom_prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['custom_prompt'] ) ) : '',
+			'publish'       => $publish,
+			'schedule_at'   => isset( $_POST['schedule_at'] ) ? sanitize_text_field( wp_unslash( $_POST['schedule_at'] ) ) : '',
+		);
+		$result = CE61_Creator::job_generate_article( $payload );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		wp_send_json_success( $result );
+	}
+
+	/* ---------- Custom Post Types (CPT) ---------- */
+
+	/**
+	 * Lista os CPTs públicos do site com origem (JetEngine/nativo), contagem,
+	 * campos detectados e se já estão habilitados no Cluster Engine.
+	 */
+	public static function cpt_list() {
+		self::guard();
+		wp_send_json_success( array(
+			'cpts'      => CE61_CPT::list_cpts(),
+			'jetengine' => (bool) CE61_CPT::is_jetengine(),
+		) );
+	}
+
+	/**
+	 * Habilita/desabilita um CPT no pipeline (indexação, clusters, linkagem).
+	 */
+	public static function cpt_toggle() {
+		self::guard();
+		$pt = isset( $_POST['post_type'] ) ? sanitize_key( wp_unslash( $_POST['post_type'] ) ) : '';
+		$on = ! empty( $_POST['enabled'] ) && '0' !== (string) $_POST['enabled'];
+		$res = $on ? CE61_CPT::enable( $pt ) : CE61_CPT::disable( $pt );
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'cpts' => CE61_CPT::list_cpts() ) );
+	}
+
+	/**
+	 * Gera UM item de CPT imediatamente, aplicando a estratégia de cluster,
+	 * linkagem interna e preenchimento dos meta fields do CPT.
+	 */
+	public static function cpt_generate() {
+		self::guard();
+		$post_type = isset( $_POST['post_type'] ) ? sanitize_key( wp_unslash( $_POST['post_type'] ) ) : '';
+		if ( ! $post_type || ! post_type_exists( $post_type ) ) {
+			wp_send_json_error( array( 'message' => __( 'Selecione um CPT válido.', 'cluster-engine' ) ) );
+		}
+		$publish = isset( $_POST['publish'] ) ? sanitize_key( $_POST['publish'] ) : 'draft';
+		if ( ! in_array( $publish, array( 'draft', 'publish', 'schedule' ), true ) ) {
+			$publish = 'draft';
+		}
+		$payload = array(
+			'post_type'     => $post_type,
 			'cluster_id'    => isset( $_POST['cluster_id'] ) ? absint( $_POST['cluster_id'] ) : 0,
 			'title'         => isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '',
 			'keyword'       => isset( $_POST['keyword'] ) ? sanitize_text_field( wp_unslash( $_POST['keyword'] ) ) : '',

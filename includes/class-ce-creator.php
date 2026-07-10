@@ -310,6 +310,7 @@ class CE61_Creator {
 		$custom_prompt = isset( $payload['custom_prompt'] ) ? trim( (string) $payload['custom_prompt'] ) : '';
 		$publish       = isset( $payload['publish'] ) ? $payload['publish'] : 'draft';
 		$schedule_at   = isset( $payload['schedule_at'] ) ? $payload['schedule_at'] : '';
+		$post_type     = isset( $payload['post_type'] ) && post_type_exists( $payload['post_type'] ) ? $payload['post_type'] : 'post';
 		if ( '' === $title ) {
 			return new WP_Error( 'ce61_job', __( 'Job sem título de tópico.', 'cluster-engine' ) );
 		}
@@ -385,7 +386,14 @@ class CE61_Creator {
 			return $html;
 		}
 
-		$post_id = self::create_draft_from_html( $title, $html, $keyword, $cluster_id, $publish, $schedule_at );
+		// Para CPTs com meta fields, a IA também preenche os campos personalizados
+		// (leitura da estrutura + geração de valores). Posts comuns não têm este passo.
+		$meta_values = array();
+		if ( 'post' !== $post_type ) {
+			$meta_values = self::generate_meta_values( $post_type, $title, $keyword ? $keyword : $title, $html );
+		}
+
+		$post_id = self::create_draft_from_html( $title, $html, $keyword, $cluster_id, $publish, $schedule_at, $post_type, $meta_values );
 		if ( is_wp_error( $post_id ) ) {
 			return $post_id;
 		}
@@ -405,22 +413,70 @@ class CE61_Creator {
 	}
 
 	/**
+	 * Pede à IA os valores dos meta fields de um CPT, com base no conteúdo já
+	 * gerado. Retorna [ field_name => value ] apenas com campos que existem na
+	 * definição do CPT (o filtro final também acontece em CE61_CPT::write_meta).
+	 */
+	public static function generate_meta_values( $post_type, $title, $keyword, $html ) {
+		$fields = CE61_CPT::meta_fields( $post_type );
+		if ( ! $fields ) {
+			return array();
+		}
+		$obj      = get_post_type_object( $post_type );
+		$cpt_label = $obj ? $obj->labels->singular_name : $post_type;
+		$plain    = mb_substr( wp_strip_all_tags( (string) $html ), 0, 4000 );
+
+		$result = CE61_AI::run( 'generate_cpt_fields', 0, array(
+			'cpt_label'        => $cpt_label,
+			'meta_fields_spec' => CE61_CPT::fields_spec( $fields ),
+			'title'            => $title,
+			'keyword'          => $keyword,
+			'content'          => $plain,
+		) );
+		if ( is_wp_error( $result ) ) {
+			return array(); // meta é complementar; falha nela não aborta o artigo.
+		}
+		$data = self::parse_json( $result );
+		if ( ! is_array( $data ) ) {
+			return array();
+		}
+		// Aceita tanto { "campo": "valor" } quanto { "__fields__": {...} }.
+		if ( isset( $data['__fields__'] ) && is_array( $data['__fields__'] ) ) {
+			$data = $data['__fields__'];
+		}
+		$allowed = array();
+		foreach ( $fields as $f ) {
+			$allowed[ $f['name'] ] = true;
+		}
+		$out = array();
+		foreach ( $data as $k => $v ) {
+			if ( isset( $allowed[ $k ] ) && ( is_scalar( $v ) || is_array( $v ) ) ) {
+				$out[ $k ] = $v;
+			}
+		}
+		return $out;
+	}
+
+	/**
 	 * Cria o post com SEO completo (keyword foco, meta title, description),
 	 * vincula ao cluster de origem, marca como gerado por IA e aplica o
 	 * status de publicação escolhido (rascunho, publicar agora, ou agendar).
 	 */
-	public static function create_draft_from_html( $title, $html, $keyword = '', $cluster_id = 0, $publish = 'draft', $schedule_at = '' ) {
+	public static function create_draft_from_html( $title, $html, $keyword = '', $cluster_id = 0, $publish = 'draft', $schedule_at = '', $post_type = 'post', $meta_values = array() ) {
 		$content = preg_replace( '/^```(?:html)?\s*|\s*```$/i', '', trim( (string) $html ) );
 		$content = wp_kses_post( $content ); // cron roda sem usuário; sanitização segura sempre.
 		if ( '' === trim( $content ) ) {
 			return new WP_Error( 'ce61_empty', __( 'A IA retornou conteúdo vazio.', 'cluster-engine' ) );
 		}
 
+		// Só aceita um post type público real; senão cai para 'post' (segurança).
+		$post_type = ( $post_type && post_type_exists( $post_type ) ) ? $post_type : 'post';
+
 		$args = array(
 			'post_title'   => sanitize_text_field( $title ),
 			'post_content' => wp_slash( $content ),
 			'post_status'  => 'draft',
-			'post_type'    => 'post',
+			'post_type'    => $post_type,
 		);
 
 		if ( 'schedule' === $publish && $schedule_at ) {
@@ -451,6 +507,9 @@ class CE61_Creator {
 		}
 		if ( $cluster_id ) {
 			update_post_meta( $post_id, '_ce61_cluster_id', (int) $cluster_id );
+		}
+		if ( $meta_values && is_array( $meta_values ) ) {
+			CE61_CPT::write_meta( $post_id, $meta_values );
 		}
 		update_post_meta( $post_id, '_ce61_ai_generated', 1 );
 		update_post_meta( $post_id, '_ce61_ai_created_at', current_time( 'mysql' ) );

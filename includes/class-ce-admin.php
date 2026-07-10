@@ -66,6 +66,12 @@ class CE61_Admin {
 					'network' => __( 'Rede de Palavras-chave', 'cluster-engine' ),
 				),
 			),
+			'cpt' => array(
+				'tabs' => array(
+					'cpt_manage'  => __( 'CPTs existentes', 'cluster-engine' ),
+					'cpt_content' => __( 'Conteúdo & clusters do CPT', 'cluster-engine' ),
+				),
+			),
 		);
 	}
 
@@ -89,6 +95,8 @@ class CE61_Admin {
 		self::$hooks[ $hook ] = 'performance';
 		$hook = add_submenu_page( 'cluster-engine', __( 'Rede de Palavras-chave', 'cluster-engine' ), __( 'Rede de Keywords', 'cluster-engine' ), 'manage_options', 'cluster-engine-network', function () { self::render( 'network' ); } );
 		self::$hooks[ $hook ] = 'network';
+		$hook = add_submenu_page( 'cluster-engine', __( 'CPTs', 'cluster-engine' ), __( 'CPTs', 'cluster-engine' ), 'manage_options', 'cluster-engine-cpt', function () { self::render( 'cpt' ); } );
+		self::$hooks[ $hook ] = 'cpt';
 	}
 
 	public static function assets( $hook ) {
@@ -119,6 +127,7 @@ class CE61_Admin {
 				'settings'    => admin_url( 'admin.php?page=cluster-engine-settings' ),
 				'performance' => admin_url( 'admin.php?page=cluster-engine-performance' ),
 				'network'     => admin_url( 'admin.php?page=cluster-engine-network' ),
+				'cpt'         => admin_url( 'admin.php?page=cluster-engine-cpt' ),
 			),
 			'prompts'  => $safe,
 			'settings' => array(
@@ -186,6 +195,7 @@ class CE61_Admin {
 				return array( 'name' => $pt->name, 'label' => $pt->labels->name );
 			}, array_values( get_post_types( array( 'public' => true ), 'objects' ) ) ),
 			'seoPlugin' => CE61_SEO::plugin_label(),
+			'jetengine' => (bool) CE61_CPT::is_jetengine(),
 		) );
 	}
 
@@ -203,6 +213,7 @@ class CE61_Admin {
 			'settings'    => __( 'Provedores de IA, prompts, limiares e integrações externas', 'cluster-engine' ),
 			'performance' => __( 'Posicionamento no Google, tráfego e cliques por página', 'cluster-engine' ),
 			'network'     => __( 'Como as palavras-chave conectam seus artigos', 'cluster-engine' ),
+			'cpt'         => __( 'Integração de Custom Post Types e geração de conteúdo', 'cluster-engine' ),
 		);
 		?>
 		<div class="ce-app" id="ce-app">

@@ -186,7 +186,9 @@
 			creator: renderCreator,
 			queue: renderQueue,
 			performance: renderPerformance,
-			network: renderNetwork
+			network: renderNetwork,
+			cpt_manage: renderCptManage,
+			cpt_content: renderCptContent
 		}[name] || function () {})();
 	}
 
@@ -3269,6 +3271,165 @@
 				window.removeEventListener('resize', onResize);
 			}
 		};
+	}
+
+	/* ---------- CPTs (Custom Post Types) ---------- */
+	function cptSourceBadge(src) {
+		return src === 'jetengine'
+			? '<span class="ce-seo-badge" title="Registrado pelo JetEngine">◈ JetEngine</span>'
+			: '<span class="ce-seo-badge" title="Post type nativo">◈ Nativo</span>';
+	}
+
+	function renderCptManage() {
+		var el = $('#ce-panel-cpt_manage');
+		el.innerHTML = '<div class="ce-loading">Lendo os Custom Post Types do site</div>';
+		api('cpt_list', {}).then(function (d) {
+			var jeNote = d.jetengine
+				? ''
+				: '<div class="ce-card" style="margin-bottom:12px"><p style="margin:0">O JetEngine não está ativo. Os CPTs nativos continuam funcionando normalmente; a leitura de campos personalizados do JetEngine fica indisponível.</p></div>';
+			if (!d.cpts.length) {
+				el.innerHTML = jeNote + '<div class="ce-empty"><h3>Nenhum Custom Post Type encontrado</h3><p>Este site só tem os tipos nativos (posts e páginas). Crie um CPT (por exemplo no JetEngine) para integrá-lo aqui.</p></div>';
+				return;
+			}
+			el.innerHTML =
+				'<div class="ce-section">' +
+					'<h2 class="ce-h2">CPTs do site</h2>' +
+					'<p class="ce-sub">Ative um CPT para o Cluster Engine tratá-lo igual aos posts: indexação, clusters, linkagem interna e diagnóstico. Depois de ativar, rode <b>Escanear site</b> no Painel para montar as relações e clusters.</p>' +
+					jeNote +
+					'<div class="ce-grid" style="grid-template-columns:repeat(auto-fill,minmax(320px,1fr))">' +
+					d.cpts.map(cptCard).join('') +
+					'</div>' +
+				'</div>';
+			bindCptCards(el);
+		}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
+	}
+
+	function cptCard(c) {
+		var fields = c.fields && c.fields.length
+			? '<p class="ce-sub" style="margin:6px 0 0">' + c.fields.length + ' campo(s): ' + c.fields.slice(0, 8).map(function (f) { return esc(f.title || f.name); }).join(', ') + (c.fields.length > 8 ? '…' : '') + '</p>'
+			: '<p class="ce-sub" style="margin:6px 0 0">Sem campos personalizados detectados.</p>';
+		return '<div class="ce-card">' +
+			'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
+				'<h3 style="font-family:var(--ce-display);margin:0">' + esc(c.label) + '</h3>' +
+				cptSourceBadge(c.source) +
+			'</div>' +
+			'<p class="ce-sub" style="margin:4px 0 0"><code>' + esc(c.name) + '</code> · ' + c.count + ' publicado(s) · ' + c.indexed + ' indexado(s)</p>' +
+			fields +
+			'<p style="margin:12px 0 0">' +
+				'<button class="ce-btn ce-btn-sm ' + (c.enabled ? '' : 'ce-btn-primary') + '" data-cpt-toggle="' + esc(c.name) + '" data-on="' + (c.enabled ? '0' : '1') + '">' +
+					(c.enabled ? '✓ Ativado — desativar' : '+ Ativar no Cluster Engine') +
+				'</button>' +
+			'</p>' +
+		'</div>';
+	}
+
+	function bindCptCards(scope) {
+		$$('[data-cpt-toggle]', scope).forEach(function (b) {
+			b.addEventListener('click', function () {
+				b.disabled = true;
+				api('cpt_toggle', { post_type: b.dataset.cptToggle, enabled: b.dataset.on }).then(function () {
+					toast(b.dataset.on === '1' ? 'CPT ativado' : 'CPT desativado');
+					loadPanel('cpt_manage', true);
+				}).catch(function (e) { b.disabled = false; toast(e.message, true); });
+			});
+		});
+	}
+
+	function renderCptContent() {
+		var el = $('#ce-panel-cpt_content');
+		el.innerHTML = '<div class="ce-loading">Carregando CPTs e clusters</div>';
+		api('cpt_list', {}).then(function (d) {
+			var enabled = d.cpts.filter(function (c) { return c.enabled; });
+			if (!enabled.length) {
+				el.innerHTML = '<div class="ce-empty"><h3>Nenhum CPT ativado ainda</h3><p>Vá na aba <b>CPTs existentes</b> e ative pelo menos um CPT para gerar conteúdo para ele.</p></div>';
+				return;
+			}
+			api('creator_data', {}).then(function (cd) {
+				var clusters = cd.clusters || [];
+				el.innerHTML =
+					'<div class="ce-section">' +
+						'<h2 class="ce-h2">Gerar conteúdo para um CPT</h2>' +
+						'<p class="ce-sub">O item é criado no tipo escolhido, com a mesma estratégia de cluster e linkagem interna dos posts. Se o CPT tiver campos personalizados, a IA também os preenche.</p>' +
+						'<div class="ce-card">' +
+							'<div class="ce-grid" style="grid-template-columns:1fr 1fr;gap:10px">' +
+								'<div class="ce-field" style="margin:0"><label>Tipo de conteúdo (CPT)</label><select class="ce-select" id="ce-cpt-type">' +
+									enabled.map(function (c) { return '<option value="' + esc(c.name) + '">' + esc(c.label) + '</option>'; }).join('') +
+								'</select></div>' +
+								'<div class="ce-field" style="margin:0"><label>Cluster (opcional)</label><select class="ce-select" id="ce-cpt-cluster"><option value="0">Nenhum / avulso</option>' +
+									clusters.map(function (c) { return '<option value="' + c.id + '">' + esc(c.name) + '</option>'; }).join('') +
+								'</select></div>' +
+							'</div>' +
+							'<div class="ce-grid" style="grid-template-columns:2fr 2fr;gap:10px">' +
+								'<div class="ce-field" style="margin:0"><label>Título</label><input class="ce-input" id="ce-cpt-title" placeholder="ex.: Título do item"></div>' +
+								'<div class="ce-field" style="margin:0"><label>Palavra-chave foco</label><input class="ce-input" id="ce-cpt-kw" placeholder="opcional"></div>' +
+							'</div>' +
+							'<div id="ce-cpt-fields"></div>' +
+							'<div class="ce-field"><label>Prompt / instruções para a IA</label>' +
+								'<textarea class="ce-textarea" id="ce-cpt-prompt" style="min-height:100px" placeholder="Deixe em branco para instruções padrão, ou descreva o que o conteúdo precisa cobrir…"></textarea>' +
+							'</div>' +
+							'<div class="ce-grid" style="grid-template-columns:1fr 1fr;gap:10px;align-items:start">' +
+								'<div class="ce-field" style="margin:0"><label>Publicação</label><select class="ce-select" id="ce-cpt-publish">' +
+									'<option value="draft">Salvar como rascunho</option>' +
+									'<option value="publish">Publicar imediatamente</option>' +
+									'<option value="schedule">Agendar</option>' +
+								'</select></div>' +
+								'<div class="ce-field" style="margin:0" id="ce-cpt-schedule-wrap" hidden><label>Data e hora</label><input class="ce-input" type="datetime-local" id="ce-cpt-schedule"></div>' +
+							'</div>' +
+							'<p><button class="ce-btn ce-btn-primary" id="ce-cpt-go">✦ Gerar conteúdo</button></p>' +
+							'<div id="ce-cpt-out"></div>' +
+						'</div>' +
+					'</div>';
+
+				function fieldsPreview() {
+					var cur = enabled.filter(function (c) { return c.name === $('#ce-cpt-type').value; })[0];
+					var box = $('#ce-cpt-fields');
+					if (cur && cur.fields && cur.fields.length) {
+						box.innerHTML = '<p class="ce-hint" style="margin:2px 0 8px">Campos que a IA vai preencher: ' +
+							cur.fields.map(function (f) { return '<span class="ce-chip">' + esc(f.title || f.name) + '</span>'; }).join(' ') + '</p>';
+					} else {
+						box.innerHTML = '';
+					}
+				}
+				fieldsPreview();
+				$('#ce-cpt-type').addEventListener('change', fieldsPreview);
+				$('#ce-cpt-publish').addEventListener('change', function () {
+					$('#ce-cpt-schedule-wrap').hidden = (this.value !== 'schedule');
+				});
+
+				$('#ce-cpt-go').addEventListener('click', function () {
+					if (!requireKey()) { return; }
+					var title = $('#ce-cpt-title').value.trim();
+					if (!title) { toast('Escreva o título', true); return; }
+					var publish = $('#ce-cpt-publish').value;
+					var schedRaw = $('#ce-cpt-schedule').value;
+					if ('schedule' === publish && !schedRaw) { toast('Escolha data e hora para agendar', true); return; }
+					var btn = $('#ce-cpt-go'), out = $('#ce-cpt-out');
+					btn.disabled = true;
+					out.innerHTML = '<div class="ce-loading">Gerando o conteúdo (até 2 min)</div>';
+					api('cpt_generate', {
+						post_type: $('#ce-cpt-type').value,
+						cluster_id: $('#ce-cpt-cluster').value,
+						title: title,
+						keyword: $('#ce-cpt-kw').value.trim(),
+						custom_prompt: $('#ce-cpt-prompt').value.trim(),
+						publish: publish,
+						schedule_at: schedRaw ? schedRaw.replace('T', ' ') + ':00' : ''
+					}).then(function (r) {
+						btn.disabled = false;
+						out.innerHTML =
+							'<div class="ce-card" style="margin-top:14px">' +
+								'<p style="margin:0 0 10px">' + statusChip(r.status, '') + ' <b style="font-family:var(--ce-display)">' + esc(r.title) + '</b></p>' +
+								'<p><a class="ce-btn ce-btn-sm" href="' + esc(r.edit) + '" target="_blank" rel="noopener">Abrir no editor</a></p>' +
+								scoresBlock(r.scores) +
+							'</div>';
+						toast('Conteúdo gerado');
+					}).catch(function (e) {
+						btn.disabled = false;
+						out.innerHTML = '<p class="ce-sub">' + esc(e.message) + '</p>';
+					});
+				});
+			}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
+		}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
 	}
 
 	/* ---------- Boot ---------- */
