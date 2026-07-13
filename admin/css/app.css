@@ -242,6 +242,10 @@
 .ce-score b { font-family: var(--ce-display); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ce-score-max { color: var(--ce-ink-3); font-weight: 500; font-size: 11px; }
 
+/* Slug da URL exibido abaixo do título nas tabelas. */
+.ce-url-slug { display: block; margin-top: 3px; font-family: var(--ce-mono, monospace); font-size: 11px; color: var(--ce-ink-3); word-break: break-word; text-decoration: none; }
+a.ce-url-slug:hover { color: var(--ce-cobalt); text-decoration: underline; }
+
 /* ---- Tables ---- */
 .ce-table-wrap { overflow-x: auto; }
 .ce-table { width: 100%; border-collapse: collapse; background: var(--ce-surface); border-radius: var(--ce-radius); overflow: hidden; }

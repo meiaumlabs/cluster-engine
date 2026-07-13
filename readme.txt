@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.5.2
+Stable tag: 2.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.7.0 =
+* Novo: na aba "Linkagem interna", cada post exibe o slug da URL abaixo do título, como link clicável que abre o post em nova aba.
+* Melhorado: a barra de similaridade agora usa cor em gradiente — quanto mais próxima de 100, mais vermelha; quanto mais próxima de 0, mais verde.
 
 = 2.5.2 =
 * Melhorado: zoom da Rede de Palavras-chave mais fluido — botões na tela (aproximar, afastar e "ajustar à tela") e zoom proporcional/suave no wheel e trackpad.

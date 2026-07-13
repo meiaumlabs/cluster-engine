@@ -137,6 +137,14 @@
 		return '<span class="ce-score" title="Escala de 0 a 100"><span class="ce-score-track"><span class="ce-score-fill ' + cls + '" data-w="' + v + '"></span></span><b>' + v + '<span class="ce-score-max">/100</span></b></span>';
 	}
 
+	/* Barra de similaridade com cor em gradiente: 0 = verde, 100 = vermelho. */
+	function simBar(v) {
+		v = Math.max(0, Math.min(100, parseInt(v, 10) || 0));
+		var hue = Math.round(120 * (1 - v / 100)); // 120 (verde) → 0 (vermelho)
+		var color = 'hsl(' + hue + ', 68%, 45%)';
+		return '<span class="ce-score ce-score-sim" title="Similaridade de 0 a 100"><span class="ce-score-track"><span class="ce-score-fill" data-w="' + v + '" style="background:' + color + '"></span></span><b style="color:' + color + '">' + v + '<span class="ce-score-max">/100</span></b></span>';
+	}
+
 	/* Auto-animate every score bar that enters the DOM (panels, modals, drawers). */
 	function animateBars(root) {
 		$$('.ce-score-fill[data-w]', root || document).forEach(function (f) {
@@ -828,10 +836,19 @@
 				if (kind === 'cannibal') {
 					actions = '<button class="ce-btn ce-btn-sm" data-merge="' + r.post_a + ':' + r.post_b + '" data-ta="' + esc(r.title_a) + '" data-tb="' + esc(r.title_b) + '">✦ Recriar unificado</button>';
 				}
+				function titleCell(title, slug, url) {
+					var slugHtml = '';
+					if (slug) {
+						slugHtml = url
+							? '<a class="ce-url-slug" href="' + esc(url) + '" target="_blank" rel="noopener">/' + esc(slug) + '</a>'
+							: '<div class="ce-url-slug">/' + esc(slug) + '</div>';
+					}
+					return '<td>' + esc(title) + slugHtml + '</td>';
+				}
 				return '<tr>' +
-					'<td>' + esc(r.title_a) + '</td>' +
-					'<td>' + esc(r.title_b) + '</td>' +
-					'<td>' + scoreBar(Math.round(r.similarity * 100), kind === 'senseless') + '</td>' +
+					titleCell(r.title_a, r.slug_a, r.url_a) +
+					titleCell(r.title_b, r.slug_b, r.url_b) +
+					'<td>' + simBar(Math.round(r.similarity * 100)) + '</td>' +
 					'<td style="white-space:nowrap">' + actions + '</td>' +
 				'</tr>';
 			}

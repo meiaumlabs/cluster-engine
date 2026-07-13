@@ -162,10 +162,25 @@ class CE61_Ajax {
 	public static function links() {
 		self::guard();
 		wp_send_json_success( array(
-			'opportunities' => CE61_Analyzer::link_opportunities( 100 ),
-			'senseless'     => CE61_Analyzer::senseless_links( 100 ),
-			'cannibal'      => CE61_Analyzer::cannibalization( 50 ),
+			'opportunities' => self::with_slugs( CE61_Analyzer::link_opportunities( 100 ) ),
+			'senseless'     => self::with_slugs( CE61_Analyzer::senseless_links( 100 ) ),
+			'cannibal'      => self::with_slugs( CE61_Analyzer::cannibalization( 50 ) ),
 		) );
+	}
+
+	/**
+	 * Enriquece pares de links com o slug (post_name) de cada post,
+	 * exibido abaixo do título na aba de Linkagem interna.
+	 */
+	private static function with_slugs( $rows ) {
+		foreach ( $rows as &$r ) {
+			$r['slug_a'] = ! empty( $r['post_a'] ) ? get_post_field( 'post_name', (int) $r['post_a'] ) : '';
+			$r['slug_b'] = ! empty( $r['post_b'] ) ? get_post_field( 'post_name', (int) $r['post_b'] ) : '';
+			$r['url_a']  = ! empty( $r['post_a'] ) ? get_permalink( (int) $r['post_a'] ) : '';
+			$r['url_b']  = ! empty( $r['post_b'] ) ? get_permalink( (int) $r['post_b'] ) : '';
+		}
+		unset( $r );
+		return $rows;
 	}
 
 	public static function keywords() {
