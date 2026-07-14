@@ -2635,8 +2635,9 @@
 				? trendArrow(p.serp.position) + ' <small class="ce-sub">' + esc(p.serp.checked_at || '') + '</small>'
 				: (hasSerp ? '<span class="ce-sub">não checado</span>' : '<span class="ce-sub">sem API</span>');
 			var gsc = p.gsc || {};
+			var slugHtml = p.slug ? '<a class="ce-url-slug" href="' + esc(p.view) + '" target="_blank" rel="noopener">/' + esc(p.slug) + '</a>' : '';
 			return '<tr>' +
-				'<td><a href="' + esc(p.edit) + '" target="_blank" rel="noopener">' + esc(p.title) + '</a><br><span class="ce-chip ce-chip-kw">' + esc(p.keyword || '—') + '</span></td>' +
+				'<td><a href="' + esc(p.edit) + '" target="_blank" rel="noopener">' + esc(p.title) + '</a>' + slugHtml + '<div style="margin-top:5px"><span class="ce-chip ce-chip-kw">' + esc(p.keyword || '—') + '</span></div></td>' +
 				'<td>' + serp + ' <button class="ce-btn ce-btn-sm ce-btn-ghost" data-serpcheck="' + p.post_id + '" data-kw="' + esc(p.keyword || '') + '" title="Reconsultar posição">↻</button></td>' +
 				'<td>' + (p.gsc ? gsc.clicks : '<span class="ce-sub">—</span>') + '</td>' +
 				'<td>' + (p.gsc ? gsc.impressions : '<span class="ce-sub">—</span>') + '</td>' +
@@ -2652,7 +2653,21 @@
 		}).join('');
 	}
 
+	/* Tier da ordenação padrão: 0 = tem posição no Google, 1 = tem impressões, 2 = nenhum dos dois. */
+	function perfRank(p) {
+		if (p.serp && p.serp.position) { return 0; }
+		if (p.gsc && p.gsc.impressions > 0) { return 1; }
+		return 2;
+	}
+
 	var perfSorters = {
+		smart: function (a, b) {
+			var ra = perfRank(a), rb = perfRank(b);
+			if (ra !== rb) { return ra - rb; }
+			if (ra === 0) { return a.serp.position - b.serp.position; }        // melhor posição primeiro
+			if (ra === 1) { return b.gsc.impressions - a.gsc.impressions; }    // mais impressões primeiro
+			return a.title.localeCompare(b.title, 'pt-BR');                    // alfabética pela página
+		},
 		title_asc:    function (a, b) { return a.title.localeCompare(b.title, 'pt-BR'); },
 		title_desc:   function (a, b) { return b.title.localeCompare(a.title, 'pt-BR'); },
 		clicks_desc:  function (a, b) { return (b.gsc ? b.gsc.clicks : -1) - (a.gsc ? a.gsc.clicks : -1); },
@@ -2666,12 +2681,12 @@
 	function applyPerfView() {
 		if (!perfData) { return; }
 		var term = ($('#ce-perf-search') ? $('#ce-perf-search').value.trim().toLowerCase() : '');
-		var sortKey = $('#ce-perf-sort') ? $('#ce-perf-sort').value : 'clicks_desc';
+		var sortKey = $('#ce-perf-sort') ? $('#ce-perf-sort').value : 'smart';
 		var list = perfData.posts.filter(function (p) {
 			if (!term) { return true; }
-			return p.title.toLowerCase().indexOf(term) > -1 || (p.keyword && p.keyword.toLowerCase().indexOf(term) > -1);
+			return p.title.toLowerCase().indexOf(term) > -1 || (p.keyword && p.keyword.toLowerCase().indexOf(term) > -1) || (p.slug && p.slug.toLowerCase().indexOf(term) > -1);
 		});
-		list = list.slice().sort(perfSorters[sortKey] || perfSorters.clicks_desc);
+		list = list.slice().sort(perfSorters[sortKey] || perfSorters.smart);
 		var tbody = $('#ce-perf-tbody');
 		if (tbody) { tbody.innerHTML = perfRowsHtml(list, perfData.has_serp); bindPerfRowActions(); }
 	}
@@ -2901,7 +2916,8 @@
 				'</div>' +
 				'<div class="ce-net-toolbar" style="margin-bottom:10px">' +
 					'<input class="ce-input" id="ce-perf-search" placeholder="Buscar por título ou keyword…" style="max-width:280px">' +
-					'<select class="ce-select" id="ce-perf-sort" style="max-width:240px">' +
+					'<select class="ce-select" id="ce-perf-sort" style="max-width:280px">' +
+						'<option value="smart">Relevância (posição › impressões › A-Z)</option>' +
 						'<option value="clicks_desc">Cliques — maior para menor</option>' +
 						'<option value="clicks_asc">Cliques — menor para maior</option>' +
 						'<option value="title_asc">Título — A a Z</option>' +
@@ -2918,7 +2934,7 @@
 
 			$('#ce-perf-search').addEventListener('input', applyPerfView);
 			$('#ce-perf-sort').addEventListener('change', applyPerfView);
-			bindPerfRowActions();
+			applyPerfView(); // aplica a ordenação padrão (Relevância) já na carga inicial.
 
 			$('#ce-perf-refresh').addEventListener('click', function () {
 				var btn = $('#ce-perf-refresh'), bar = $('#ce-perf-bar'), fill = $('#ce-perf-fill'), msg = $('#ce-perf-msg');

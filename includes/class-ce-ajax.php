@@ -1061,6 +1061,7 @@ class CE61_Ajax {
 				'post_id'      => $pid,
 				'title'        => $r['title'],
 				'keyword'      => $r['main_keyword'],
+				'slug'         => get_post_field( 'post_name', $pid ),
 				'edit'         => get_edit_post_link( $pid, 'raw' ),
 				'view'         => get_permalink( $pid ),
 				'serp'         => CE61_Serp::get_cached( $pid ),
