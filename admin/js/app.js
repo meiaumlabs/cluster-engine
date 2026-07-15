@@ -815,9 +815,15 @@
 			}).then(function (d) {
 				return api('create_draft', { title: topic, content: d.result, focus_keyword: kw, source_post_id: cluster.pillar_id || 0 });
 			}).then(function (d) {
-				out.innerHTML = '<p class="ce-chip ce-chip-green">Rascunho criado com SEO completo</p> <a class="ce-btn ce-btn-sm" href="' + esc(d.edit) + '" target="_blank" rel="noopener">Abrir no editor</a>' +
-					(d.preview ? ' <a class="ce-btn ce-btn-sm ce-btn-ghost" href="' + esc(d.preview) + '" target="_blank" rel="noopener">Pré-visualizar</a>' : '');
+				out.innerHTML = '<p><span class="ce-chip ce-chip-green">Rascunho criado com SEO completo</span></p>' +
+					'<p><a class="ce-btn ce-btn-sm" href="' + esc(d.edit) + '" target="_blank" rel="noopener">Abrir no editor</a> ' +
+					(d.preview ? '<a class="ce-btn ce-btn-sm ce-btn-ghost" href="' + esc(d.preview) + '" target="_blank" rel="noopener">Pré-visualizar</a> ' : '') +
+					'<button class="ce-btn ce-btn-sm ce-btn-primary" id="ce-gap-pub">Publicar/Agendar</button></p>';
 				toast('Rascunho criado no WordPress');
+				var gapPub = $('#ce-gap-pub');
+				if (gapPub) {
+					gapPub.addEventListener('click', function () { openPublishModal(d.id, null); });
+				}
 			}).catch(function (e) { out.innerHTML = '<p>' + esc(e.message) + '</p>'; });
 		});
 	}
@@ -1726,11 +1732,22 @@
 						genBtn.disabled = false;
 						out.innerHTML =
 							'<div class="ce-card" style="margin-top:14px">' +
-								'<p style="margin:0 0 10px">' + statusChip(r.status, '') + ' <b style="font-family:var(--ce-display)">' + esc(r.title) + '</b></p>' +
-								'<p><a class="ce-btn ce-btn-sm" href="' + esc(r.edit) + '" target="_blank" rel="noopener">Abrir no editor</a></p>' +
+								'<p style="margin:0 0 10px" id="ce-gen-status">' + statusChip(r.status, '') + ' <b style="font-family:var(--ce-display)">' + esc(r.title) + '</b></p>' +
+								'<p><a class="ce-btn ce-btn-sm" href="' + esc(r.edit) + '" target="_blank" rel="noopener">Abrir no editor</a> ' +
+								'<button class="ce-btn ce-btn-sm ce-btn-primary" id="ce-gen-pub">Publicar/Agendar</button></p>' +
 								scoresBlock(r.scores) +
 							'</div>';
 						toast('Artigo gerado');
+						var genPub = $('#ce-gen-pub');
+						if (genPub) {
+							genPub.addEventListener('click', function () {
+								openPublishModal(r.post_id, function (status) {
+									var st = $('#ce-gen-status');
+									if (st) { st.innerHTML = statusChip(status, '') + ' <b style="font-family:var(--ce-display)">' + esc(r.title) + '</b>'; }
+									loadAiPosts();
+								});
+							});
+						}
 						loadAiPosts();
 					}).catch(function (e) {
 						genBtn.disabled = false;
@@ -3477,11 +3494,21 @@
 						btn.disabled = false;
 						out.innerHTML =
 							'<div class="ce-card" style="margin-top:14px">' +
-								'<p style="margin:0 0 10px">' + statusChip(r.status, '') + ' <b style="font-family:var(--ce-display)">' + esc(r.title) + '</b></p>' +
-								'<p><a class="ce-btn ce-btn-sm" href="' + esc(r.edit) + '" target="_blank" rel="noopener">Abrir no editor</a></p>' +
+								'<p style="margin:0 0 10px" id="ce-cpt-status">' + statusChip(r.status, '') + ' <b style="font-family:var(--ce-display)">' + esc(r.title) + '</b></p>' +
+								'<p><a class="ce-btn ce-btn-sm" href="' + esc(r.edit) + '" target="_blank" rel="noopener">Abrir no editor</a> ' +
+								'<button class="ce-btn ce-btn-sm ce-btn-primary" id="ce-cpt-pub">Publicar/Agendar</button></p>' +
 								scoresBlock(r.scores) +
 							'</div>';
 						toast('Conteúdo gerado');
+						var cptPub = $('#ce-cpt-pub');
+						if (cptPub) {
+							cptPub.addEventListener('click', function () {
+								openPublishModal(r.post_id, function (status) {
+									var st = $('#ce-cpt-status');
+									if (st) { st.innerHTML = statusChip(status, '') + ' <b style="font-family:var(--ce-display)">' + esc(r.title) + '</b>'; }
+								});
+							});
+						}
 					}).catch(function (e) {
 						btn.disabled = false;
 						out.innerHTML = '<p class="ce-sub">' + esc(e.message) + '</p>';
