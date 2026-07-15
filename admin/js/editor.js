@@ -66,24 +66,69 @@
 			'</div>';
 	}
 
-	function collectIssues(d) {
+	// Conjunto de keys com correção automática (vem do servidor em d.autofix).
+	function autofixSet(d) {
+		var set = {};
+		(d && d.autofix ? d.autofix : ['no_faq', 'no_answer_capsule', 'no_meta_desc', 'no_image']).forEach(function (k) { set[k] = 1; });
+		return set;
+	}
+
+	// Pendências estruturadas: { grp, label, key } deduplicadas por grupo+rótulo.
+	function collectIssueItems(d) {
 		var out = [];
 		var s = d.scores || {};
 		[['eeat', 'E-E-A-T'], ['aeo', 'AEO'], ['geo', 'GEO']].forEach(function (pair) {
 			var grp = s[pair[0]];
 			if (grp && grp.issues && grp.issues.length) {
 				grp.issues.forEach(function (it) {
-					if (it && it.label) { out.push('[' + pair[1] + '] ' + it.label); }
+					if (it && it.label) { out.push({ grp: pair[1], label: it.label, key: it.key || '' }); }
 				});
 			}
 		});
 		if (d.index && d.index.issues && d.index.issues.length) {
-			d.index.issues.forEach(function (it) { out.push('[SEO] ' + it); });
+			d.index.issues.forEach(function (it) { out.push({ grp: 'SEO', label: it, key: '' }); });
 		}
-		// dedup
 		var seen = {}, uniq = [];
-		out.forEach(function (x) { if (!seen[x]) { seen[x] = 1; uniq.push(x); } });
+		out.forEach(function (x) { var k = x.grp + '|' + x.label; if (!seen[k]) { seen[k] = 1; uniq.push(x); } });
 		return uniq;
+	}
+
+	function issuesListHtml(d) {
+		var items = collectIssueItems(d);
+		if (!items.length) {
+			return '<p class="ce61-muted">' + esc(T.issuesNone || '') + '</p>';
+		}
+		var fix = autofixSet(d);
+		return '<ul class="ce61-issues">' + items.map(function (it) {
+			var action = (it.key && fix[it.key])
+				? '<button type="button" class="ce61-issue-fix" data-issue="' + esc(it.key) + '">' + esc(T.fixBtn || 'Corrigir') + '</button>'
+				: '<span class="ce61-issue-manual" title="' + esc(T.fixManual || '') + '">' + esc(T.fixManualShort || '') + '</span>';
+			return '<li class="ce61-issue">' +
+				'<span class="ce61-issue-txt"><b>[' + esc(it.grp) + ']</b> ' + esc(it.label) + '</span>' +
+				action + '</li>';
+		}).join('') + '</ul>';
+	}
+
+	function metaBlock(d) {
+		var m = d.meta || {};
+		function field(f, label, isArea, val, max) {
+			var input = isArea
+				? '<textarea class="ce61-meta-input" rows="3" maxlength="' + max + '">' + esc(val || '') + '</textarea>'
+				: '<input type="text" class="ce61-meta-input" maxlength="' + max + '" value="' + esc(val || '') + '">';
+			return '<div class="ce61-meta-field" data-metafield="' + f + '">' +
+				'<label>' + esc(label) + '</label>' + input +
+				'<div class="ce61-meta-row">' +
+					'<button type="button" class="button ce61-meta-gen" data-field="' + f + '">' + esc(T.metaGen || '') + '</button>' +
+					'<button type="button" class="button button-primary ce61-meta-save" data-field="' + f + '">' + esc(T.metaSave || '') + '</button>' +
+				'</div>' +
+				'<div class="ce61-meta-opts" hidden></div>' +
+			'</div>';
+		}
+		return '<div class="ce61-diag-block ce61-meta-block"><h4>' + esc(T.metaTitle || '') + '</h4>' +
+			'<p class="ce61-muted ce61-meta-hint">' + esc(T.metaHint || '') + '</p>' +
+			field('title', T.metaTitleLabel || 'Meta título', false, m.title, 70) +
+			field('desc', T.metaDescLabel || 'Meta descrição', true, m.desc, 170) +
+			'</div>';
 	}
 
 	function perfRow(label, latest, delta, invert) {
@@ -139,10 +184,6 @@
 	function renderDiagColumn(d) {
 		var s = d.scores || {};
 		var scoreVal = function (k) { return s[k] && typeof s[k].score !== 'undefined' ? s[k].score : 0; };
-		var issues = collectIssues(d);
-		var issuesHtml = issues.length
-			? '<ul class="ce61-issues">' + issues.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul>'
-			: '<p class="ce61-muted">' + esc(T.issuesNone || '') + '</p>';
 
 		var scanHtml = '';
 		if (d.index) {
@@ -151,14 +192,92 @@
 				'<span>AEO/GEO <b>' + (d.index.aeo | 0) + '</b></span></div></div>';
 		}
 
-		return '<div class="ce61-diag-block"><h4>' + esc(T.scoresTitle || '') + '</h4>' +
+		return '<div class="ce61-diag-msg" aria-live="polite" hidden></div>' +
+			'<div class="ce61-diag-block"><h4>' + esc(T.scoresTitle || '') + '</h4>' +
 				bar('E-E-A-T', scoreVal('eeat')) + bar('AEO', scoreVal('aeo')) + bar('GEO', scoreVal('geo')) +
 			'</div>' +
 			scanHtml +
+			metaBlock(d) +
 			'<div class="ce61-diag-block"><h4>' + esc(T.perfTitle || '') + '</h4>' + renderPerf(d.performance) + '</div>' +
-			'<div class="ce61-diag-block"><h4>' + esc(T.issuesTitle || '') + '</h4>' + issuesHtml + '</div>' +
+			'<div class="ce61-diag-block"><h4>' + esc(T.issuesTitle || '') + '</h4>' + issuesListHtml(d) + '</div>' +
 			'<div class="ce61-diag-block ce61-log-block"><h4>' + esc(T.logTitle || '') + '</h4>' +
 				'<div class="ce61-log-wrap">' + renderLog(d.changelog) + '</div></div>';
+	}
+
+	// Re-renderiza a coluna de diagnóstico com o diagData atual (após salvar meta
+	// ou corrigir uma pendência) e, opcionalmente, mostra uma mensagem no topo.
+	function refreshDiag(msg, kind) {
+		var col = overlay && overlay.querySelector('.ce61-col-diag');
+		if (!col) { return; }
+		col.innerHTML = '<h3>' + esc(T.colDiag || '') + '</h3>' + renderDiagColumn(diagData || {});
+		if (msg) { diagMsg(msg, kind); }
+	}
+
+	function diagMsg(text, kind) {
+		var el = overlay && overlay.querySelector('.ce61-diag-msg');
+		if (!el) { return; }
+		el.hidden = false;
+		el.className = 'ce61-diag-msg' + (kind ? ' is-' + kind : '');
+		el.textContent = text;
+	}
+
+	/* ---------- Meta título / meta descrição ---------- */
+
+	function genMeta(field) {
+		var wrap = overlay.querySelector('.ce61-meta-field[data-metafield="' + field + '"]');
+		if (!wrap) { return; }
+		var btn = wrap.querySelector('.ce61-meta-gen');
+		var opts = wrap.querySelector('.ce61-meta-opts');
+		var prev = btn.textContent;
+		btn.disabled = true;
+		btn.textContent = T.metaGenning || '…';
+		api('editor_fix', { post_id: CFG.postId, task: field === 'title' ? 'gen_title' : 'gen_desc' }).then(function (d) {
+			btn.disabled = false;
+			btn.textContent = prev;
+			var list = d.options || [];
+			if (!list.length) { diagMsg(T.metaNoOpts || '', 'error'); return; }
+			opts.hidden = false;
+			opts.innerHTML = '<span class="ce61-meta-opts-hint">' + esc(T.metaOptsHint || '') + '</span>' +
+				list.map(function (o) { return '<button type="button" class="ce61-meta-opt">' + esc(o) + '</button>'; }).join('');
+		}).catch(function (e) {
+			btn.disabled = false;
+			btn.textContent = prev;
+			diagMsg(e.message || (T.error || 'Erro'), 'error');
+		});
+	}
+
+	function saveMeta(field) {
+		var wrap = overlay.querySelector('.ce61-meta-field[data-metafield="' + field + '"]');
+		if (!wrap) { return; }
+		var input = wrap.querySelector('.ce61-meta-input');
+		var value = input ? input.value.trim() : '';
+		if (!value) { diagMsg(T.metaEmpty || '', 'error'); input && input.focus(); return; }
+		var btn = wrap.querySelector('.ce61-meta-save');
+		var prev = btn.textContent;
+		btn.disabled = true;
+		btn.textContent = T.metaSaving || '…';
+		api('editor_fix', { post_id: CFG.postId, task: 'save_meta', field: field, value: value }).then(function (d) {
+			if (d.diag) { diagData = d.diag; }
+			refreshDiag((field === 'title' ? T.metaTitleSaved : T.metaDescSaved) || '', 'ok');
+		}).catch(function (e) {
+			btn.disabled = false;
+			btn.textContent = prev;
+			diagMsg(e.message || (T.error || 'Erro'), 'error');
+		});
+	}
+
+	function fixIssue(key, btn) {
+		var prev = btn.textContent;
+		btn.disabled = true;
+		btn.textContent = T.fixing || '…';
+		api('editor_fix', { post_id: CFG.postId, task: 'issue', key: key }).then(function (d) {
+			if (d.diag) { diagData = d.diag; }
+			refreshDiag(d.message || T.fixed || '', 'ok');
+		}).catch(function (e) {
+			btn.disabled = false;
+			btn.textContent = prev;
+			diagMsg(e.message || (T.error || 'Erro'), 'error');
+		});
 	}
 
 	/* ---------- Modal ---------- */
@@ -422,6 +541,26 @@
 
 		var rev = e.target.closest ? e.target.closest('.ce61-log-revert') : null;
 		if (rev) { e.preventDefault(); revertEntry(rev.getAttribute('data-entry'), rev); return; }
+
+		var metaGen = e.target.closest ? e.target.closest('.ce61-meta-gen') : null;
+		if (metaGen) { e.preventDefault(); genMeta(metaGen.getAttribute('data-field')); return; }
+
+		var metaSave = e.target.closest ? e.target.closest('.ce61-meta-save') : null;
+		if (metaSave) { e.preventDefault(); saveMeta(metaSave.getAttribute('data-field')); return; }
+
+		var metaOpt = e.target.closest ? e.target.closest('.ce61-meta-opt') : null;
+		if (metaOpt) {
+			e.preventDefault();
+			var f = metaOpt.closest('.ce61-meta-field');
+			var inp = f && f.querySelector('.ce61-meta-input');
+			if (inp) { inp.value = metaOpt.textContent; inp.focus(); }
+			var wrap = metaOpt.closest('.ce61-meta-opts');
+			if (wrap) { wrap.hidden = true; }
+			return;
+		}
+
+		var issueFix = e.target.closest ? e.target.closest('.ce61-issue-fix') : null;
+		if (issueFix) { e.preventDefault(); fixIssue(issueFix.getAttribute('data-issue'), issueFix); return; }
 	});
 
 	/* ---------- Imagem destacada ---------- */

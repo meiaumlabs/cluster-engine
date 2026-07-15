@@ -23,7 +23,7 @@ class CE61_Ajax {
 			'save_settings', 'save_prompts', 'reset_prompt', 'rename_cluster', 'set_pillar',
 			'creator_data', 'suggest_clusters', 'create_cluster', 'delete_cluster',
 			'cluster_plan', 'remove_topic', 'generate_now', 'improve_prompt', 'ai_posts_list', 'post_eeat', 'set_publish', 'creator_fix_issue',
-			'editor_improve', 'editor_diagnostics', 'editor_apply', 'editor_log', 'editor_revert',
+			'editor_improve', 'editor_diagnostics', 'editor_apply', 'editor_log', 'editor_revert', 'editor_fix',
 			'queue_add', 'queue_list', 'queue_cancel', 'queue_retry', 'queue_clear', 'queue_run_now',
 			'performance_data', 'performance_refresh_batch', 'performance_serp_one', 'index_status_batch', 'index_request_batch', 'index_status_one', 'index_request_one',
 			'performance_history', 'performance_insight', 'performance_insight_save', 'performance_insight_list', 'performance_insight_delete',
@@ -1871,44 +1871,67 @@ class CE61_Ajax {
 		self::guard();
 		$pid = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
 		$key = isset( $_POST['key'] ) ? sanitize_key( $_POST['key'] ) : '';
+
+		$res = self::run_issue_fix( $pid, $key );
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
+		}
+		if ( ! empty( $res['queued'] ) ) {
+			wp_send_json_success( array( 'queued' => true ) );
+		}
+
+		$scores = CE61_Creator::analyze_scores( $pid );
+		update_post_meta( $pid, '_ce61_scores', wp_json_encode( $scores, JSON_UNESCAPED_UNICODE ) );
+		wp_send_json_success( array( 'scores' => $scores ) );
+	}
+
+	/**
+	 * Aplica a correção automática de uma pendência do diagnóstico (por key).
+	 * Compartilhado entre o painel (creator_fix_issue) e a modal do editor
+	 * (editor_fix), garantindo a mesma lógica nos dois lugares.
+	 *
+	 * Retorna array( 'queued' => bool ) em sucesso, ou WP_Error em falha.
+	 * Keys com correção automática: no_faq, no_answer_capsule, no_meta_desc, no_image.
+	 */
+	private static function run_issue_fix( $pid, $key ) {
 		$post = $pid ? get_post( $pid ) : null;
 		if ( ! $post ) {
-			wp_send_json_error( array( 'message' => __( 'Post inválido.', 'cluster-engine' ) ) );
+			return new WP_Error( 'ce_no_post', __( 'Post inválido.', 'cluster-engine' ) );
 		}
 
 		switch ( $key ) {
 			case 'no_faq':
 				$ai = CE61_AI::run( 'faq_schema', $pid );
 				if ( is_wp_error( $ai ) ) {
-					wp_send_json_error( array( 'message' => $ai->get_error_message() ) );
+					return $ai;
 				}
 				$r = CE61_Schema::apply_faq( $pid, $ai );
 				if ( is_wp_error( $r ) ) {
-					wp_send_json_error( array( 'message' => $r->get_error_message() ) );
+					return $r;
 				}
-				break;
+				return array( 'queued' => false );
 
 			case 'no_answer_capsule':
 				$ai = CE61_AI::run( 'answer_capsule', $pid );
 				if ( is_wp_error( $ai ) ) {
-					wp_send_json_error( array( 'message' => $ai->get_error_message() ) );
+					return $ai;
 				}
 				$para = trim( wp_strip_all_tags( $ai ) );
 				$para = preg_replace( '/^```(?:html)?\s*|\s*```$/i', '', $para );
 				if ( '' === $para ) {
-					wp_send_json_error( array( 'message' => __( 'A IA não retornou um parágrafo de abertura.', 'cluster-engine' ) ) );
+					return new WP_Error( 'ce_ai_empty', __( 'A IA não retornou um parágrafo de abertura.', 'cluster-engine' ) );
 				}
 				$content = '<p>' . $para . '</p>' . "\n" . $post->post_content;
 				$upd = wp_update_post( array( 'ID' => $pid, 'post_content' => wp_slash( $content ) ), true );
 				if ( is_wp_error( $upd ) ) {
-					wp_send_json_error( array( 'message' => $upd->get_error_message() ) );
+					return $upd;
 				}
-				break;
+				return array( 'queued' => false );
 
 			case 'no_meta_desc':
 				$ai = CE61_AI::run( 'rewrite_desc', $pid );
 				if ( is_wp_error( $ai ) ) {
-					wp_send_json_error( array( 'message' => $ai->get_error_message() ) );
+					return $ai;
 				}
 				$desc = '';
 				foreach ( preg_split( '/\r\n|\r|\n/', (string) $ai ) as $line ) {
@@ -1920,10 +1943,10 @@ class CE61_Ajax {
 					}
 				}
 				if ( '' === $desc ) {
-					wp_send_json_error( array( 'message' => __( 'A IA não retornou uma meta description.', 'cluster-engine' ) ) );
+					return new WP_Error( 'ce_ai_empty', __( 'A IA não retornou uma meta description.', 'cluster-engine' ) );
 				}
 				CE61_SEO::set_meta_desc( $pid, mb_substr( $desc, 0, 156 ) );
-				break;
+				return array( 'queued' => false );
 
 			case 'no_image':
 				$id = CE61_Queue::add( 'generate_image', array(
@@ -1932,18 +1955,111 @@ class CE61_Ajax {
 					'query'   => get_the_title( $pid ),
 				) );
 				if ( is_wp_error( $id ) ) {
-					wp_send_json_error( array( 'message' => $id->get_error_message() ) );
+					return $id;
 				}
-				wp_send_json_success( array( 'queued' => true ) );
-				break;
+				return array( 'queued' => true );
 
 			default:
-				wp_send_json_error( array( 'message' => __( 'Esse ajuste não tem correção automática — revise no editor.', 'cluster-engine' ) ) );
+				return new WP_Error( 'ce_no_autofix', __( 'Esse ajuste não tem correção automática — revise no editor.', 'cluster-engine' ) );
+		}
+	}
+
+	/**
+	 * Keys de pendência que possuem correção automática (usado no front para
+	 * decidir se mostra o botão "Corrigir" na modal).
+	 */
+	private static function autofix_keys() {
+		return array( 'no_faq', 'no_answer_capsule', 'no_meta_desc', 'no_image' );
+	}
+
+	/**
+	 * Extrai as opções (uma por linha, numeradas) devolvidas pela IA em
+	 * rewrite_title/rewrite_desc, já limpas e deduplicadas.
+	 */
+	private static function parse_ai_options( $raw ) {
+		$out = array();
+		foreach ( preg_split( '/\r\n|\r|\n/', (string) $raw ) as $line ) {
+			$line = trim( preg_replace( '/^\s*\d+[\).\-]\s*/', '', $line ) );
+			$line = trim( $line, "\"' " );
+			if ( '' !== $line ) {
+				$out[] = $line;
+			}
+		}
+		return array_slice( array_values( array_unique( $out ) ), 0, 5 );
+	}
+
+	/**
+	 * Meta título e meta descrição atuais (via bridge de SEO) para a modal.
+	 */
+	private static function current_meta( $pid ) {
+		return array(
+			'title' => CE61_SEO::get_meta_title( $pid ),
+			'desc'  => CE61_SEO::get_meta_desc( $pid ),
+		);
+	}
+
+	/**
+	 * Endpoint da modal do editor para ações individualizadas:
+	 *  - task 'gen_title' / 'gen_desc': gera 3+ opções com IA (NÃO salva);
+	 *  - task 'save_meta' (field title|desc, value): salva o meta escolhido/editado;
+	 *  - task 'issue' (key): aplica a correção automática de uma pendência.
+	 * Guardado por manage_options (guard) + edit_post do post alvo.
+	 */
+	public static function editor_fix() {
+		self::guard();
+		@set_time_limit( 120 );
+		$pid  = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$task = isset( $_POST['task'] ) ? sanitize_key( $_POST['task'] ) : '';
+		$post = $pid ? get_post( $pid ) : null;
+		if ( ! $post ) {
+			wp_send_json_error( array( 'message' => __( 'Post não encontrado.', 'cluster-engine' ) ) );
+		}
+		if ( ! current_user_can( 'edit_post', $pid ) ) {
+			wp_send_json_error( array( 'message' => __( 'Sem permissão para editar este conteúdo.', 'cluster-engine' ) ), 403 );
 		}
 
-		$scores = CE61_Creator::analyze_scores( $pid );
-		update_post_meta( $pid, '_ce61_scores', wp_json_encode( $scores, JSON_UNESCAPED_UNICODE ) );
-		wp_send_json_success( array( 'scores' => $scores ) );
+		if ( 'gen_title' === $task || 'gen_desc' === $task ) {
+			$tmpl = ( 'gen_title' === $task ) ? 'rewrite_title' : 'rewrite_desc';
+			$ai   = CE61_AI::run( $tmpl, $pid );
+			if ( is_wp_error( $ai ) ) {
+				wp_send_json_error( array( 'message' => $ai->get_error_message() ) );
+			}
+			$opts = self::parse_ai_options( (string) $ai );
+			if ( empty( $opts ) ) {
+				wp_send_json_error( array( 'message' => __( 'A IA não retornou opções utilizáveis.', 'cluster-engine' ) ) );
+			}
+			wp_send_json_success( array( 'options' => $opts ) );
+		}
+
+		if ( 'save_meta' === $task ) {
+			$field = isset( $_POST['field'] ) ? sanitize_key( $_POST['field'] ) : '';
+			$value = isset( $_POST['value'] ) ? sanitize_text_field( wp_unslash( $_POST['value'] ) ) : '';
+			if ( ! in_array( $field, array( 'title', 'desc' ), true ) || '' === trim( $value ) ) {
+				wp_send_json_error( array( 'message' => __( 'Parâmetros inválidos.', 'cluster-engine' ) ) );
+			}
+			if ( 'title' === $field ) {
+				CE61_SEO::set_meta_title( $pid, mb_substr( $value, 0, 60 ) );
+			} else {
+				CE61_SEO::set_meta_desc( $pid, mb_substr( $value, 0, 156 ) );
+			}
+			wp_send_json_success( array( 'ok' => true, 'diag' => self::collect_diagnostics( $pid ) ) );
+		}
+
+		if ( 'issue' === $task ) {
+			$key = isset( $_POST['key'] ) ? sanitize_key( $_POST['key'] ) : '';
+			$res = self::run_issue_fix( $pid, $key );
+			if ( is_wp_error( $res ) ) {
+				wp_send_json_error( array( 'message' => $res->get_error_message() ) );
+			}
+			$out = array( 'ok' => true, 'diag' => self::collect_diagnostics( $pid ) );
+			if ( ! empty( $res['queued'] ) ) {
+				$out['queued']  = true;
+				$out['message'] = __( 'Geração de imagem na fila — a imagem destacada será definida em instantes.', 'cluster-engine' );
+			}
+			wp_send_json_success( $out );
+		}
+
+		wp_send_json_error( array( 'message' => __( 'Ação inválida.', 'cluster-engine' ) ) );
 	}
 
 	/**
@@ -2019,9 +2135,11 @@ class CE61_Ajax {
 			'status'      => $post ? $post->post_status : '',
 			'url'         => $post ? get_permalink( $pid ) : '',
 			'keyword'     => $keyword,
+			'meta'        => self::current_meta( $pid ),
 			'scores'      => $scores,
 			'index'       => $index,
 			'performance' => $perf,
+			'autofix'     => self::autofix_keys(),
 			'changelog'   => class_exists( 'CE61_Changelog' ) ? CE61_Changelog::entries( $pid ) : array(),
 		);
 	}
