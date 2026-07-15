@@ -289,6 +289,37 @@ a.ce-url-slug:hover { color: var(--ce-cobalt); text-decoration: underline; }
 .ce-chip-green { background: var(--ce-green-soft); color: var(--ce-green); }
 .ce-chip-pillar { background: var(--ce-ink); color: #fff; }
 
+/* Coluna "Status índice": botões de verificar / solicitar indexação. */
+.ce-idx-cell { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.ce-idx-btn {
+	border: 1px solid var(--ce-line); background: var(--ce-surface);
+	color: var(--ce-ink-3); font-size: 11.5px; font-weight: 600;
+	border-radius: 999px; padding: 3px 10px; line-height: 1.5;
+	cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+}
+/* "não checado" → verde "Verificar indexação" no hover (troca de rótulo). */
+.ce-idx-check .ce-idx-b { display: none; }
+.ce-idx-check:hover, .ce-idx-check:focus-visible {
+	background: var(--ce-green-soft); color: var(--ce-green); border-color: var(--ce-green);
+}
+.ce-idx-check:hover .ce-idx-a, .ce-idx-check:focus-visible .ce-idx-a { display: none; }
+.ce-idx-check:hover .ce-idx-b, .ce-idx-check:focus-visible .ce-idx-b { display: inline; }
+/* "Solicitar indexação": âmbar, fica verde no hover. */
+.ce-idx-req {
+	background: var(--ce-amber-soft); color: var(--ce-amber); border-color: transparent;
+}
+.ce-idx-req:hover, .ce-idx-req:focus-visible {
+	background: var(--ce-green-soft); color: var(--ce-green); border-color: var(--ce-green);
+}
+.ce-idx-btn.is-done { background: var(--ce-green-soft); color: var(--ce-green); border-color: var(--ce-green); cursor: default; }
+.ce-idx-btn.is-loading { opacity: .6; cursor: progress; }
+.ce-idx-recheck {
+	border: 0; background: transparent; cursor: pointer; color: var(--ce-ink-3);
+	font-size: 13px; line-height: 1; padding: 2px 4px; border-radius: 6px;
+}
+.ce-idx-recheck:hover { color: var(--ce-cobalt); background: var(--ce-cobalt-soft); }
+.ce-idx-recheck.is-loading { opacity: .5; cursor: progress; }
+
 /* ---- Section headings ---- */
 .ce-h2 {
 	font-family: var(--ce-display); font-size: 17px; font-weight: 600;

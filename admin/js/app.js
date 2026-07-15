@@ -2783,15 +2783,83 @@
 
 	var perfData = null; // dataset cru desta carga, para ordenar/filtrar no cliente sem nova chamada.
 
-	function indexChip(idx) {
-		if (!idx || !idx.state) { return '<span class="ce-sub">não checado</span>'; }
+	// Conteúdo interno da célula "Status índice" (sem o wrapper com data-idxcell).
+	function indexCellInner(idx, pid) {
+		if (!idx || !idx.state) {
+			// Botão: mostra "não checado"; no hover fica verde e vira "Verificar indexação".
+			return '<button type="button" class="ce-idx-btn ce-idx-check" data-idxcheck="' + pid + '" title="Verificar no Google (URL Inspection)">' +
+				'<span class="ce-idx-a">não checado</span>' +
+				'<span class="ce-idx-b">Verificar indexação</span>' +
+				'</button>';
+		}
 		var map = {
 			indexed:     ['Indexado', 'ce-chip ce-chip-green'],
 			not_indexed: ['Não indexado', 'ce-chip ce-chip-red'],
 			unknown:     ['Desconhecido', 'ce-chip ce-chip-amber']
 		};
 		var m = map[idx.state] || map.unknown;
-		return '<span class="' + m[1] + '" title="' + esc(idx.coverage || '') + '">' + m[0] + '</span>';
+		var out = '<span class="' + m[1] + '" title="' + esc(idx.coverage || '') + '">' + m[0] + '</span>';
+		// Reverificar sempre disponível; "Solicitar indexação" só quando não indexado.
+		out += ' <button type="button" class="ce-idx-recheck" data-idxcheck="' + pid + '" title="Verificar novamente">↻</button>';
+		if (idx.state === 'not_indexed') {
+			out += '<button type="button" class="ce-idx-btn ce-idx-req" data-idxreq="' + pid + '" title="Notificar o Google via Indexing API">Solicitar indexação</button>';
+		}
+		return out;
+	}
+
+	function indexChip(idx, pid) {
+		return '<span class="ce-idx-cell" data-idxcell="' + pid + '">' + indexCellInner(idx, pid) + '</span>';
+	}
+
+	// Atualiza a célula de índice de uma linha e o dataset cacheado.
+	function updateIndexCell(pid, idx) {
+		if (perfData && perfData.posts) {
+			perfData.posts.forEach(function (p) { if (String(p.post_id) === String(pid)) { p.index = idx; } });
+		}
+		var cell = $('[data-idxcell="' + pid + '"]', $('#ce-panel-performance'));
+		if (cell) {
+			cell.innerHTML = indexCellInner(idx, pid);
+			bindPerfIndexRow(cell);
+		}
+	}
+
+	// Liga os botões de índice (verificar / reverificar / solicitar) de um escopo.
+	function bindPerfIndexRow(scope) {
+		$$('[data-idxcheck]', scope).forEach(function (b) {
+			if (b.dataset.bound) { return; }
+			b.dataset.bound = '1';
+			b.addEventListener('click', function () {
+				var pid = b.dataset.idxcheck;
+				b.disabled = true;
+				b.classList.add('is-loading');
+				api('index_status_one', { post_id: pid }).then(function (r) {
+					updateIndexCell(pid, r.index);
+				}).catch(function (e) {
+					b.disabled = false;
+					b.classList.remove('is-loading');
+					toast(e.message, true);
+				});
+			});
+		});
+		$$('[data-idxreq]', scope).forEach(function (b) {
+			if (b.dataset.bound) { return; }
+			b.dataset.bound = '1';
+			b.addEventListener('click', function () {
+				var pid = b.dataset.idxreq;
+				b.disabled = true;
+				b.classList.add('is-loading');
+				api('index_request_one', { post_id: pid }).then(function (r) {
+					b.classList.remove('is-loading');
+					b.classList.add('is-done');
+					b.textContent = 'Solicitado ✓';
+					toast(r.message || 'Indexação solicitada.');
+				}).catch(function (e) {
+					b.disabled = false;
+					b.classList.remove('is-loading');
+					toast(e.message, true);
+				});
+			});
+		});
 	}
 
 	function perfRowsHtml(list, hasSerp) {
@@ -2807,7 +2875,7 @@
 				'<td style="width:32px;text-align:center">' + selCell + '</td>' +
 				'<td><a href="' + esc(p.edit) + '" target="_blank" rel="noopener">' + esc(p.title) + '</a>' + slugHtml + '<div style="margin-top:5px"><span class="ce-chip ce-chip-kw">' + esc(p.keyword || '—') + '</span></div></td>' +
 				'<td>' + serp + ' <button class="ce-btn ce-btn-sm ce-btn-ghost" data-serpcheck="' + p.post_id + '" data-kw="' + esc(p.keyword || '') + '" title="Reconsultar posição">↻</button></td>' +
-				'<td>' + indexChip(p.index) + '</td>' +
+				'<td>' + indexChip(p.index, p.post_id) + '</td>' +
 				'<td>' + (p.gsc ? gsc.clicks : '<span class="ce-sub">—</span>') + '</td>' +
 				'<td>' + (p.gsc ? gsc.impressions : '<span class="ce-sub">—</span>') + '</td>' +
 				'<td>' + (p.gsc ? gsc.ctr + '%' : '<span class="ce-sub">—</span>') + '</td>' +
@@ -2950,6 +3018,7 @@
 		$$('[data-perfinsight]', el).forEach(function (b) {
 			b.addEventListener('click', function () { openPerfInsight(b.dataset.perfinsight, b.dataset.title); });
 		});
+		bindPerfIndexRow(el); // botões Verificar / Solicitar indexação por linha.
 		// Seleção: recontar ao marcar/desmarcar (checkboxes são recriados a cada re-render).
 		$$('.ce-perf-sel', el).forEach(function (c) { c.addEventListener('change', refreshPerfSelCount); });
 		var selall = $('#ce-perf-selall');

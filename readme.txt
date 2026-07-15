@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.19.0
+Stable tag: 2.20.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.20.0 =
+* Novo: na coluna "Status índice" da tabela de Desempenho, o "não checado" agora é um botão — passe o mouse e ele fica verde ("Verificar indexação"); ao clicar, consulta o estado real no Google (URL Inspection API) na hora, sem precisar rodar o lote.
+* Novo: quando a página volta como "Não indexado", aparece o botão "Solicitar indexação" ao lado, que notifica o Google (Indexing API) para aquela URL específica. Também há um ↻ para reverificar qualquer página.
+* Nota: solicitar indexação apenas avisa o Google — a indexação em si não é garantida nem imediata (a Indexing API é oficialmente para páginas JobPosting/BroadcastEvent).
 
 = 2.19.0 =
 * Novo: ícones de ordenação clicáveis no cabeçalho da tabela de desempenho (?page=cluster-engine-performance). Clique em qualquer coluna — Página, Posição Google, Status índice, Cliques, Impressões, CTR, Posição média, Sessões (GA4) — para ordenar; um novo clique inverte a direção. A seta ▲/▼ indica a coluna e o sentido ativos, sincronizados com o seletor de ordenação existente.

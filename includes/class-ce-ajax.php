@@ -25,7 +25,7 @@ class CE61_Ajax {
 			'cluster_plan', 'remove_topic', 'generate_now', 'improve_prompt', 'ai_posts_list', 'post_eeat', 'set_publish', 'creator_fix_issue',
 			'editor_improve', 'editor_diagnostics', 'editor_apply', 'editor_log', 'editor_revert',
 			'queue_add', 'queue_list', 'queue_cancel', 'queue_retry', 'queue_clear', 'queue_run_now',
-			'performance_data', 'performance_refresh_batch', 'performance_serp_one', 'index_status_batch', 'index_request_batch',
+			'performance_data', 'performance_refresh_batch', 'performance_serp_one', 'index_status_batch', 'index_request_batch', 'index_status_one', 'index_request_one',
 			'performance_history', 'performance_insight', 'performance_insight_save', 'performance_insight_list', 'performance_insight_delete',
 			'google_status', 'google_disconnect', 'google_list_sites', 'google_list_ga4', 'google_test_gsc', 'google_test_ga4',
 			'keyword_network',
@@ -1222,6 +1222,57 @@ class CE61_Ajax {
 			'sent'  => $sent,
 			'fail'  => $fail,
 			'notes' => array_slice( array_unique( $notes ), 0, 3 ),
+		) );
+	}
+
+	/**
+	 * Checa a indexação de UMA página (URL Inspection API) sob demanda — usado
+	 * pelo botão "Verificar indexação" na coluna Status índice da tabela. Salva
+	 * o resultado em _ce61_index_status e devolve o estado para a linha.
+	 */
+	public static function index_status_one() {
+		self::guard();
+		if ( ! CE61_Gsc::is_connected() ) {
+			wp_send_json_error( array( 'message' => __( 'Conecte o Google Search Console em Integrações.', 'cluster-engine' ) ) );
+		}
+		$pid = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$url = $pid ? get_permalink( $pid ) : '';
+		if ( ! $url ) {
+			wp_send_json_error( array( 'message' => __( 'Página inválida.', 'cluster-engine' ) ) );
+		}
+		$r = CE61_Gsc::inspect_url( $url );
+		if ( is_wp_error( $r ) ) {
+			wp_send_json_error( array( 'message' => $r->get_error_message() ) );
+		}
+		$r['checked_at'] = current_time( 'mysql' );
+		update_post_meta( $pid, '_ce61_index_status', wp_json_encode( $r, JSON_UNESCAPED_UNICODE ) );
+		wp_send_json_success( array( 'index' => $r ) );
+	}
+
+	/**
+	 * Solicita a indexação de UMA página (Indexing API) sob demanda — usado pelo
+	 * botão "Solicitar indexação" que aparece quando a página está "Não indexado".
+	 */
+	public static function index_request_one() {
+		self::guard();
+		if ( ! CE61_Gsc::is_connected() ) {
+			wp_send_json_error( array( 'message' => __( 'Conecte o Google Search Console em Integrações.', 'cluster-engine' ) ) );
+		}
+		if ( ! CE61_Gsc::has_indexing_scope() ) {
+			wp_send_json_error( array( 'message' => __( 'Reconecte o Google em Integrações para habilitar o envio de indexação (novo escopo).', 'cluster-engine' ) ) );
+		}
+		$pid = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$url = $pid ? get_permalink( $pid ) : '';
+		if ( ! $url ) {
+			wp_send_json_error( array( 'message' => __( 'Página inválida.', 'cluster-engine' ) ) );
+		}
+		$r = CE61_Gsc::request_indexing( $url );
+		if ( is_wp_error( $r ) ) {
+			wp_send_json_error( array( 'message' => $r->get_error_message() ) );
+		}
+		wp_send_json_success( array(
+			'ok'      => true,
+			'message' => __( 'Indexação solicitada. O Google recebeu o aviso — a indexação em si não é garantida nem imediata.', 'cluster-engine' ),
 		) );
 	}
 
