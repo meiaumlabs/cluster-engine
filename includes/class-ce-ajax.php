@@ -22,7 +22,7 @@ class CE61_Ajax {
 			'stock_search', 'stock_apply', 'stock_status',
 			'save_settings', 'save_prompts', 'reset_prompt', 'rename_cluster', 'set_pillar',
 			'creator_data', 'suggest_clusters', 'create_cluster', 'delete_cluster',
-			'cluster_plan', 'remove_topic', 'generate_now', 'improve_prompt', 'ai_posts_list', 'post_eeat', 'set_publish',
+			'cluster_plan', 'remove_topic', 'generate_now', 'improve_prompt', 'ai_posts_list', 'post_eeat', 'set_publish', 'creator_fix_issue',
 			'queue_add', 'queue_list', 'queue_cancel', 'queue_retry', 'queue_clear', 'queue_run_now',
 			'performance_data', 'performance_refresh_batch', 'performance_serp_one',
 			'performance_history', 'performance_insight', 'performance_insight_save', 'performance_insight_list', 'performance_insight_delete',
@@ -1708,6 +1708,90 @@ class CE61_Ajax {
 		$scores = CE61_Creator::analyze_scores( $pid );
 		update_post_meta( $pid, '_ce61_scores', wp_json_encode( $scores, JSON_UNESCAPED_UNICODE ) );
 		wp_send_json_success( array( 'scores' => $scores, 'keyword' => CE61_SEO::get_focus_keyword( $pid ) ) );
+	}
+
+	/**
+	 * Corrige com IA um ajuste específico apontado em "Ver ajustes" (E-E-A-T/AEO/GEO).
+	 * Cada chave de issue tem um remédio determinístico; ao final, recalcula as notas.
+	 * Issues sem correção automática segura não expõem botão no painel.
+	 */
+	public static function creator_fix_issue() {
+		self::guard();
+		$pid = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$key = isset( $_POST['key'] ) ? sanitize_key( $_POST['key'] ) : '';
+		$post = $pid ? get_post( $pid ) : null;
+		if ( ! $post ) {
+			wp_send_json_error( array( 'message' => __( 'Post inválido.', 'cluster-engine' ) ) );
+		}
+
+		switch ( $key ) {
+			case 'no_faq':
+				$ai = CE61_AI::run( 'faq_schema', $pid );
+				if ( is_wp_error( $ai ) ) {
+					wp_send_json_error( array( 'message' => $ai->get_error_message() ) );
+				}
+				$r = CE61_Schema::append_html( $pid, $ai );
+				if ( is_wp_error( $r ) ) {
+					wp_send_json_error( array( 'message' => $r->get_error_message() ) );
+				}
+				break;
+
+			case 'no_answer_capsule':
+				$ai = CE61_AI::run( 'answer_capsule', $pid );
+				if ( is_wp_error( $ai ) ) {
+					wp_send_json_error( array( 'message' => $ai->get_error_message() ) );
+				}
+				$para = trim( wp_strip_all_tags( $ai ) );
+				$para = preg_replace( '/^```(?:html)?\s*|\s*```$/i', '', $para );
+				if ( '' === $para ) {
+					wp_send_json_error( array( 'message' => __( 'A IA não retornou um parágrafo de abertura.', 'cluster-engine' ) ) );
+				}
+				$content = '<p>' . $para . '</p>' . "\n" . $post->post_content;
+				$upd = wp_update_post( array( 'ID' => $pid, 'post_content' => wp_slash( $content ) ), true );
+				if ( is_wp_error( $upd ) ) {
+					wp_send_json_error( array( 'message' => $upd->get_error_message() ) );
+				}
+				break;
+
+			case 'no_meta_desc':
+				$ai = CE61_AI::run( 'rewrite_desc', $pid );
+				if ( is_wp_error( $ai ) ) {
+					wp_send_json_error( array( 'message' => $ai->get_error_message() ) );
+				}
+				$desc = '';
+				foreach ( preg_split( '/\r\n|\r|\n/', (string) $ai ) as $line ) {
+					$line = trim( preg_replace( '/^\s*\d+[\).\-]\s*/', '', $line ) );
+					$line = trim( $line, "\"' " );
+					if ( '' !== $line ) {
+						$desc = $line;
+						break;
+					}
+				}
+				if ( '' === $desc ) {
+					wp_send_json_error( array( 'message' => __( 'A IA não retornou uma meta description.', 'cluster-engine' ) ) );
+				}
+				CE61_SEO::set_meta_desc( $pid, mb_substr( $desc, 0, 156 ) );
+				break;
+
+			case 'no_image':
+				$id = CE61_Queue::add( 'generate_image', array(
+					'post_id' => $pid,
+					'source'  => 'auto',
+					'query'   => get_the_title( $pid ),
+				) );
+				if ( is_wp_error( $id ) ) {
+					wp_send_json_error( array( 'message' => $id->get_error_message() ) );
+				}
+				wp_send_json_success( array( 'queued' => true ) );
+				break;
+
+			default:
+				wp_send_json_error( array( 'message' => __( 'Esse ajuste não tem correção automática — revise no editor.', 'cluster-engine' ) ) );
+		}
+
+		$scores = CE61_Creator::analyze_scores( $pid );
+		update_post_meta( $pid, '_ce61_scores', wp_json_encode( $scores, JSON_UNESCAPED_UNICODE ) );
+		wp_send_json_success( array( 'scores' => $scores ) );
 	}
 
 	/**

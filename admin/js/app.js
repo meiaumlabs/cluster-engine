@@ -1558,13 +1558,23 @@
 	}
 
 	/* ---------- E-E-A-T e status de publicação (compartilhado) ---------- */
-	function scoresBlock(scores) {
+	/* Ajustes que têm correção automática por IA/fila (chave do issue → rótulo do botão). */
+	var fixableIssues = {
+		no_faq: '✍ Gerar FAQ',
+		no_answer_capsule: '✍ Gerar abertura',
+		no_meta_desc: '✍ Gerar meta description',
+		no_image: '✦ Gerar imagem'
+	};
+	function scoresBlock(scores, fixPid) {
 		if (!scores) { return ''; }
 		function one(key, title, hint) {
 			var s = scores[key];
 			if (!s) { return ''; }
 			var issues = (s.issues || []).map(function (i) {
-				return '<li>' + esc(i.label) + ' <span class="ce-sub">(−' + i.weight + ' pts)</span></li>';
+				var fix = (fixPid && fixableIssues[i.key])
+					? ' <button class="ce-btn ce-btn-sm ce-btn-ghost" data-fixissue="' + esc(i.key) + '" data-fixpid="' + fixPid + '">' + fixableIssues[i.key] + '</button>'
+					: '';
+				return '<li>' + esc(i.label) + ' <span class="ce-sub">(−' + i.weight + ' pts)</span>' + fix + '</li>';
 			}).join('');
 			return '<div class="ce-eeat-col">' +
 				'<p class="ce-kpi-label" style="margin-bottom:6px">' + title + '</p>' +
@@ -1579,6 +1589,43 @@
 				one('aeo', 'AEO', 'Prontidão para respostas diretas e People Also Ask') +
 				one('geo', 'GEO', 'Prontidão para ser citado por IA generativa') +
 			'</div></div>';
+	}
+
+	/* Modal "Ver ajustes": mostra as notas com botões "Corrigir" por ajuste
+	   automatizável (FAQ, answer capsule, meta description, imagem). */
+	function openEeatModal(pid, title, scores) {
+		function render(sc) {
+			modal('<h3 class="ce-h2">' + esc(title) + '</h3>' + scoresBlock(sc, pid) +
+				'<p class="ce-sub" style="margin-top:10px">Botões “Corrigir” aplicam a correção com IA direto no post; ajustes sem botão precisam de revisão manual no editor.</p>' +
+				'<p style="margin-top:12px"><button class="ce-btn ce-btn-sm" id="ce-eeat-recalc">↻ Recalcular notas</button></p>');
+			$('#ce-eeat-recalc').addEventListener('click', function () {
+				api('post_eeat', { post_id: pid }).then(function (r) { render(r.scores); loadAiPosts(); });
+			});
+			$$('[data-fixissue]').forEach(function (b) {
+				b.addEventListener('click', function () {
+					var key = b.dataset.fixissue;
+					if ('no_image' !== key && !requireKey()) { return; }
+					b.disabled = true;
+					b.textContent = 'Corrigindo…';
+					api('creator_fix_issue', { post_id: pid, key: key }).then(function (r) {
+						if (r.queued) {
+							toast('Imagem enviada para a Fila de Geração');
+							loadAiPosts();
+							gotoTab('queue');
+							return;
+						}
+						toast('Ajuste corrigido');
+						render(r.scores);
+						loadAiPosts();
+					}).catch(function (e) {
+						b.disabled = false;
+						b.textContent = fixableIssues[key] || 'Corrigir';
+						toast(e.message, true);
+					});
+				});
+			});
+		}
+		render(scores);
 	}
 
 	function statusChip(status, date) {
@@ -1838,14 +1885,7 @@
 			$$('[data-eeatinfo]', box).forEach(function (b) {
 				b.addEventListener('click', function () {
 					var p = d.posts.filter(function (x) { return String(x.post_id) === b.dataset.eeatinfo; })[0];
-					modal('<h3 class="ce-h2">' + esc(p.title) + '</h3>' + scoresBlock(p.scores) +
-						'<p style="margin-top:14px"><button class="ce-btn ce-btn-sm" id="ce-eeat-recalc">↻ Recalcular</button></p>');
-					$('#ce-eeat-recalc').addEventListener('click', function () {
-						api('post_eeat', { post_id: p.post_id }).then(function (r) {
-							modal('<h3 class="ce-h2">' + esc(p.title) + '</h3>' + scoresBlock(r.scores));
-							loadAiPosts();
-						});
-					});
+					openEeatModal(p.post_id, p.title, p.scores);
 				});
 			});
 			$$('[data-pubctl]', box).forEach(function (b) {
