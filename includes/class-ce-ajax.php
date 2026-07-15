@@ -2099,7 +2099,15 @@ class CE61_Ajax {
 				}
 			}
 			if ( isset( $in['gsc_site_url'] ) ) {
-				$g['gsc_site_url'] = esc_url_raw( trim( $in['gsc_site_url'] ) );
+				$site = trim( (string) $in['gsc_site_url'] );
+				if ( 0 === stripos( $site, 'sc-domain:' ) ) {
+					// Propriedade de Domínio do Search Console: não é URL http(s), então
+					// esc_url_raw() a apagaria. Preserva o prefixo e sanitiza como texto.
+					$domain = sanitize_text_field( substr( $site, strlen( 'sc-domain:' ) ) );
+					$g['gsc_site_url'] = $domain ? 'sc-domain:' . $domain : '';
+				} else {
+					$g['gsc_site_url'] = esc_url_raw( $site );
+				}
 			}
 			if ( isset( $in['ga4_property_id'] ) ) {
 				$raw = sanitize_text_field( $in['ga4_property_id'] );

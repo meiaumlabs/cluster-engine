@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.13.0
+Stable tag: 2.14.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.14.0 =
+* Correção: a propriedade do Search Console do tipo Domínio (`sc-domain:seusite.com.br`) não era salva em Integrações — o `esc_url_raw()` apagava o valor por não ser uma URL http(s). Agora o prefixo `sc-domain:` é preservado e a conexão com o Search Console se mantém após selecionar a propriedade.
 
 = 2.13.0 =
 * Novo: coluna "Status índice" na página de Desempenho — mostra se cada URL está Indexada, Não indexada ou Desconhecida no Google, via URL Inspection API do Search Console, com botão "Checar indexação (lote)".
