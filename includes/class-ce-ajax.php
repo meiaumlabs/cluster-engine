@@ -16,7 +16,7 @@ class CE61_Ajax {
 			'scan_index', 'scan_relations', 'scan_cluster', 'scan_finalize',
 			'dashboard', 'clusters', 'cluster_detail', 'links', 'diagnostics', 'keywords', 'report',
 			'ai_run', 'test_ai', 'apply_meta', 'dismiss_relation', 'create_draft', 'insert_link',
-			'merge_apply', 'schema_scan', 'schema_results', 'schema_fix_article', 'schema_fix_faq', 'schema_post_types', 'schema_queue_add',
+			'merge_apply', 'schema_scan', 'schema_results', 'schema_fix_article', 'schema_fix_faq', 'schema_post_types', 'schema_queue_add', 'schema_remove',
 			'headings_preview', 'apply_headings',
 			'images_list', 'image_prompt', 'image_generate', 'images_queue_add',
 			'stock_search', 'stock_apply', 'stock_status',
@@ -632,12 +632,30 @@ class CE61_Ajax {
 		if ( is_wp_error( $ai ) ) {
 			wp_send_json_error( array( 'message' => $ai->get_error_message() ) );
 		}
-		$result = CE61_Schema::append_html( $pid, $ai );
+		$result = CE61_Schema::apply_faq( $pid, $ai );
 		if ( is_wp_error( $result ) ) {
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
 		}
 		CE61_Schema::audit_post( $pid );
 		wp_send_json_success( array( 'mode' => 'inserted' ) );
+	}
+
+	/**
+	 * Remove o schema gerido pelo Cluster Engine desta página (campo do Rank
+	 * Math + blocos JSON-LD no conteúdo) e re-audita.
+	 */
+	public static function schema_remove() {
+		self::guard();
+		$pid = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		if ( ! $pid || ! get_post( $pid ) ) {
+			wp_send_json_error( array( 'message' => __( 'Página inválida.', 'cluster-engine' ) ) );
+		}
+		$result = CE61_Schema::remove_schema( $pid );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		CE61_Schema::audit_post( $pid );
+		wp_send_json_success( array( 'mode' => $result ) );
 	}
 
 	/**
@@ -1813,7 +1831,7 @@ class CE61_Ajax {
 				if ( is_wp_error( $ai ) ) {
 					wp_send_json_error( array( 'message' => $ai->get_error_message() ) );
 				}
-				$r = CE61_Schema::append_html( $pid, $ai );
+				$r = CE61_Schema::apply_faq( $pid, $ai );
 				if ( is_wp_error( $r ) ) {
 					wp_send_json_error( array( 'message' => $r->get_error_message() ) );
 				}

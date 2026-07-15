@@ -290,7 +290,7 @@ class CE61_Queue {
 			if ( is_wp_error( $ai ) ) {
 				return $ai;
 			}
-			$result = CE61_Schema::append_html( $post_id, $ai );
+			$result = CE61_Schema::apply_faq( $post_id, $ai );
 		} else {
 			$result = CE61_Schema::insert_article_schema( $post_id );
 		}

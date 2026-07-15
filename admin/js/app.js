@@ -749,7 +749,7 @@
 
 	/* ---------- Global delegated clicks: works for any dynamically rendered button ---------- */
 	document.addEventListener('click', function (e) {
-		var t = e.target.closest ? e.target.closest('[data-ai],[data-anchor],[data-dismiss],[data-open],[data-pillar],[data-merge],[data-goto],[data-fixschema-article],[data-fixschema-faq],[data-fixheadings],[data-imggen],[data-imgview]') : null;
+		var t = e.target.closest ? e.target.closest('[data-ai],[data-anchor],[data-dismiss],[data-open],[data-pillar],[data-merge],[data-goto],[data-fixschema-article],[data-fixschema-faq],[data-schema-remove],[data-fixheadings],[data-imggen],[data-imgview]') : null;
 		if (!t || t.disabled) { return; }
 		if (t.dataset.goto) {
 			var parts = t.dataset.goto.split('#');
@@ -765,6 +765,7 @@
 		}
 		if (t.dataset.fixschemaArticle) { runSchemaFix(t, 'article'); return; }
 		if (t.dataset.fixschemaFaq) { runSchemaFix(t, 'faq'); return; }
+		if (t.dataset.schemaRemove) { runSchemaRemove(t); return; }
 		if (t.dataset.ai) { runAIAction(t); return; }
 		if (t.dataset.anchor) { runAnchorAction(t); return; }
 		if (t.dataset.merge) { runMergeAction(t); return; }
@@ -1048,7 +1049,10 @@
 					actions += '<button class="ce-btn ce-btn-sm" data-fixschema-article="' + r.post_id + '">◈ Inserir Article</button> ';
 				}
 				if (canFaq) {
-					actions += '<button class="ce-btn ce-btn-sm" data-fixschema-faq="' + r.post_id + '">✍ Gerar FAQ + schema</button>';
+					actions += '<button class="ce-btn ce-btn-sm" data-fixschema-faq="' + r.post_id + '">✍ Gerar FAQ + schema</button> ';
+				}
+				if (r.types.length) {
+					actions += '<button class="ce-btn ce-btn-sm ce-btn-ghost" data-schema-remove="' + r.post_id + '" title="Remove o schema gerado pelo Cluster Engine (campo do Rank Math e blocos no conteúdo)">✕ Remover schema</button>';
 				}
 				var check = (canArticle || canFaq)
 					? '<input type="checkbox" class="ce-schema-sel" value="' + r.post_id + '" data-article="' + (canArticle ? 1 : 0) + '" data-faq="' + (canFaq ? 1 : 0) + '">'
@@ -1061,9 +1065,14 @@
 					'<td style="white-space:nowrap">' + actions + '</td>' +
 				'</tr>';
 			}).join('');
+			var rankmath = /rank\s*math/i.test(CE61.seoPlugin || '');
+			var rmNote = rankmath
+				? '<p class="ce-sub" style="margin:0 0 12px">◈ Rank Math detectado: o schema é gravado no <b>campo de schema do Rank Math</b> (não como texto no conteúdo).</p>'
+				: '';
 			box.innerHTML =
 				'<div class="ce-card ce-table-wrap">' +
 				'<p style="margin:0 0 12px"><b style="font-family:var(--ce-display)">' + withIssues + '</b> de ' + d.results.length + ' páginas com pendências de schema</p>' +
+				rmNote +
 				'<div class="ce-net-toolbar" style="margin-bottom:12px">' +
 					'<label class="ce-check"><input type="checkbox" id="ce-schema-selall"> Selecionar tudo</label>' +
 					'<select class="ce-select" id="ce-schema-bulk-mode" style="max-width:240px">' +
@@ -1154,12 +1163,27 @@
 		btn.disabled = true;
 		btn.textContent = 'Inserindo…';
 		api(kind === 'faq' ? 'schema_fix_faq' : 'schema_fix_article', { post_id: pid }).then(function (d) {
-			toast(d.mode === 'already' ? 'Este post já tinha o schema no conteúdo' : 'Schema inserido no post');
+			toast(d.mode === 'already' ? 'Este post já tinha o schema' : 'Schema aplicado');
 			loadSchemaResults();
 		}).catch(function (e) {
 			btn.disabled = false;
 			btn.textContent = kind === 'faq' ? '✍ Gerar FAQ + schema' : '◈ Inserir Article';
 			modal('<h3 class="ce-h2">Não foi possível inserir</h3><p>' + esc(e.message) + '</p>');
+		});
+	}
+
+	function runSchemaRemove(btn) {
+		var pid = btn.dataset.schemaRemove;
+		if (!window.confirm('Remover o schema gerado pelo Cluster Engine desta página? Isso apaga o campo de schema do Rank Math criado pelo plugin e retira os blocos JSON-LD do conteúdo.')) { return; }
+		btn.disabled = true;
+		btn.textContent = 'Removendo…';
+		api('schema_remove', { post_id: pid }).then(function () {
+			toast('Schema removido');
+			loadSchemaResults();
+		}).catch(function (e) {
+			btn.disabled = false;
+			btn.textContent = '✕ Remover schema';
+			modal('<h3 class="ce-h2">Não foi possível remover</h3><p>' + esc(e.message) + '</p>');
 		});
 	}
 

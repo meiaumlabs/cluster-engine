@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.15.0
+Stable tag: 2.16.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.16.0 =
+* Novo: com o Rank Math ativo, o schema (Article/BlogPosting e FAQ) passa a ser gravado no campo de schema do Rank Math (postmeta rank_math_schema_*) em vez de ser injetado como <script> JSON-LD no conteúdo. Vale ao inserir Article, gerar FAQ, na correção "Ver ajustes" e na fila em massa. Reexecutar atualiza o mesmo schema em vez de duplicar.
+* Novo: botão "Remover schema" na Auditoria de Schema — apaga o schema gerado pelo Cluster Engine (campo do Rank Math criado pelo plugin) e retira do conteúdo os blocos JSON-LD.
+* Ao migrar para o campo do Rank Math, os blocos JSON-LD equivalentes que estavam no corpo do post são removidos, para o schema não aparecer mais como texto no conteúdo.
 
 = 2.15.0 =
 * Novo: extensão do Cluster Engine no editor. Um ícone de IA na barra superior do admin abre um modal onde você descreve o que precisa ser atualizado — a IA reescreve e melhora o conteúdo do post/página mantendo o assunto e a base de configuração do site, usando o conhecimento que já tem.
