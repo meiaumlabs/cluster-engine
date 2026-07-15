@@ -2056,7 +2056,12 @@ class CE61_Ajax {
 	 * com as instruções do usuário. NÃO salva: devolve o rascunho para aprovação
 	 * junto das notas atuais. O salvamento/publicação ocorre em editor_apply().
 	 *
-	 * mode: 'diagnostic' (só diagnóstico) ou 'combined' (diagnóstico + prompt).
+	 * mode:
+	 *  - 'diagnostic': só o diagnóstico corrige as pendências;
+	 *  - 'combined':   diagnóstico + prompt do usuário;
+	 *  - 'refine':     ajusta o RASCUNHO já gerado (param base) com um novo pedido.
+	 * h2:   nº desejado de subtítulos H2 (0 = livre).
+	 * base: HTML de um rascunho anterior a ser refinado (só no modo 'refine').
 	 */
 	public static function editor_improve() {
 		self::guard();
@@ -2064,6 +2069,8 @@ class CE61_Ajax {
 		$pid          = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
 		$mode         = isset( $_POST['mode'] ) ? sanitize_key( $_POST['mode'] ) : 'combined';
 		$instructions = isset( $_POST['instructions'] ) ? sanitize_textarea_field( wp_unslash( $_POST['instructions'] ) ) : '';
+		$h2           = isset( $_POST['h2'] ) ? absint( $_POST['h2'] ) : 0;
+		$base         = isset( $_POST['base'] ) ? wp_kses_post( wp_unslash( $_POST['base'] ) ) : '';
 		$post         = $pid ? get_post( $pid ) : null;
 		if ( ! $post ) {
 			wp_send_json_error( array( 'message' => __( 'Post não encontrado.', 'cluster-engine' ) ) );
@@ -2071,11 +2078,20 @@ class CE61_Ajax {
 		if ( ! current_user_can( 'edit_post', $pid ) ) {
 			wp_send_json_error( array( 'message' => __( 'Sem permissão para editar este conteúdo.', 'cluster-engine' ) ), 403 );
 		}
-		if ( 'diagnostic' !== $mode ) {
+		if ( ! in_array( $mode, array( 'diagnostic', 'combined', 'refine' ), true ) ) {
 			$mode = 'combined';
 		}
-		if ( 'combined' === $mode && '' === trim( $instructions ) ) {
-			wp_send_json_error( array( 'message' => __( 'Escreva o que a IA deve fazer, ou use o botão de melhorar só com base no diagnóstico.', 'cluster-engine' ) ) );
+		if ( $h2 > 12 ) {
+			$h2 = 12;
+		}
+		if ( in_array( $mode, array( 'combined', 'refine' ), true ) && '' === trim( $instructions ) ) {
+			$err = ( 'refine' === $mode )
+				? __( 'Descreva o ajuste que a IA deve aplicar ao rascunho.', 'cluster-engine' )
+				: __( 'Escreva o que a IA deve fazer, ou use o botão de melhorar só com base no diagnóstico.', 'cluster-engine' );
+			wp_send_json_error( array( 'message' => $err ) );
+		}
+		if ( 'refine' === $mode && '' === trim( $base ) ) {
+			wp_send_json_error( array( 'message' => __( 'Rascunho base ausente para ajustar. Gere um rascunho primeiro.', 'cluster-engine' ) ) );
 		}
 
 		$diag      = self::collect_diagnostics( $pid );
@@ -2083,11 +2099,19 @@ class CE61_Ajax {
 
 		if ( 'diagnostic' === $mode ) {
 			$final = "Melhore o conteúdo corrigindo prioritariamente as pendências do diagnóstico abaixo e elevando as notas E-E-A-T, AEO e GEO.\n\nDIAGNÓSTICO DO CLUSTER ENGINE:\n" . $diag_text;
+		} elseif ( 'refine' === $mode ) {
+			$final = "O conteúdo abaixo JÁ é uma versão melhorada (rascunho). Aplique APENAS o ajuste pedido, preservando o que já está bom — estrutura, links internos e imagens.\n\nAJUSTE PEDIDO:\n" . $instructions . "\n\nSe for útil, use também o diagnóstico abaixo.\n\nDIAGNÓSTICO DO CLUSTER ENGINE:\n" . $diag_text;
 		} else {
 			$final = "PEDIDO DO USUÁRIO:\n" . $instructions . "\n\nAlém do pedido acima, cruze com o diagnóstico do Cluster Engine e corrija as pendências relevantes, elevando as notas E-E-A-T, AEO e GEO.\n\nDIAGNÓSTICO DO CLUSTER ENGINE:\n" . $diag_text;
 		}
 
-		$content_html = mb_substr( (string) $post->post_content, 0, 12000 );
+		if ( $h2 > 0 ) {
+			$final .= "\n\nESTRUTURA: organize o conteúdo com aproximadamente " . $h2 . " subtítulos <h2> bem distribuídos, cada um cobrindo um subtema distinto (sem contar o título/H1).";
+		}
+
+		// No modo 'refine', a base a melhorar é o rascunho enviado; senão, o conteúdo salvo.
+		$source       = ( 'refine' === $mode && '' !== trim( $base ) ) ? $base : (string) $post->post_content;
+		$content_html = mb_substr( $source, 0, 12000 );
 		$ai = CE61_AI::run( 'improve_post', $pid, array(
 			'instructions' => $final,
 			'content_html' => $content_html,

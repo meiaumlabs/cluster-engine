@@ -276,3 +276,31 @@
 .ce61-draft img { max-width: 100%; height: auto; }
 .ce61-draft h1, .ce61-draft h2, .ce61-draft h3 { margin: 14px 0 8px; }
 .ce61-draft p { margin: 0 0 10px; }
+.ce61-draft.is-compact { max-height: 26vh; }
+
+/* Campo de nº de H2. */
+.ce61-h2-field {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 10px 0 0;
+	font-size: 12px;
+	color: #50575e;
+}
+.ce61-h2-field input {
+	width: 74px;
+	padding: 4px 8px;
+	border-radius: 6px;
+}
+
+/* Textarea de ajuste. */
+.ce61-refine-text {
+	width: 100%;
+	box-sizing: border-box;
+	resize: vertical;
+	font-size: 14px;
+	line-height: 1.5;
+	padding: 10px 12px;
+	border-radius: 8px;
+	margin-top: 12px;
+}

@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.17.0
+Stable tag: 2.18.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.18.0 =
+* Novo: botão "Ajustar melhoria" na tela de aprovação do rascunho. Em vez de recomeçar do conteúdo original, a IA refina o próprio rascunho já gerado a partir de um novo pedido (ex.: "encurte a conclusão", "transforme o 3º parágrafo em lista"). Dá para ajustar quantas vezes quiser antes de aprovar.
+* Novo: campo "Quantos H2 incluir?" na geração e no ajuste — você define o número desejado de subtítulos H2 e a IA estrutura o conteúdo com essa quantidade.
 
 = 2.17.0 =
 * Novo: a modal "Melhorar com IA" do editor agora tem 2 colunas. À esquerda, o diagnóstico do próprio Cluster Engine — notas E-E-A-T/AEO/GEO, o scan SEO/AEO do Painel, o desempenho dos últimos 90 dias (cliques, impressões, posição GSC/Google, sessões GA4, CTR, com variação) e a lista de melhorias sugeridas. À direita, o campo de prompt.

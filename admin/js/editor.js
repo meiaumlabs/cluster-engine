@@ -168,6 +168,8 @@
 	var lastDraft = '';    // rascunho gerado aguardando aprovação
 	var lastMode = '';
 	var lastPrompt = '';   // último texto digitado (preservado ao refazer)
+	var lastH2 = 0;        // último nº de H2 pedido (preservado ao refazer)
+	var lastApproval = null; // última resposta de rascunho (p/ voltar do ajuste)
 
 	function closeModal() {
 		if (overlay) {
@@ -222,6 +224,8 @@
 				'<div class="ce61-col ce61-col-diag"><h3>' + esc(T.colDiag || '') + '</h3>' + renderDiagColumn(d) + '</div>' +
 				'<div class="ce61-col ce61-col-prompt"><h3>' + esc(T.colPrompt || '') + '</h3>' +
 					'<textarea class="ce61-ed-text" rows="8" placeholder="' + esc(T.placeholder || '') + '">' + esc(lastPrompt) + '</textarea>' +
+					'<label class="ce61-h2-field"><span>' + esc(T.h2Label || '') + '</span>' +
+						'<input type="number" class="ce61-h2" min="0" max="12" step="1" placeholder="0" value="' + (lastH2 ? lastH2 : '') + '"></label>' +
 					'<div class="ce61-ed-msg" aria-live="polite" hidden></div>' +
 					'<div class="ce61-ed-actions">' +
 						'<button type="button" class="button ce61-gen" data-mode="diagnostic">' + esc(T.genDiag || '') + '</button>' +
@@ -242,28 +246,58 @@
 		msg.textContent = text;
 	}
 
+	function readH2(sel) {
+		var el = overlay.querySelector(sel);
+		var v = el ? parseInt(el.value, 10) : 0;
+		if (isNaN(v) || v < 0) { v = 0; }
+		if (v > 12) { v = 12; }
+		return v;
+	}
+
+	// Núcleo da geração: dispara editor_improve e mostra o rascunho para aprovação.
+	function runImprove(payload, disableSel) {
+		var buttons = overlay.querySelectorAll(disableSel);
+		buttons.forEach(function (b) { b.disabled = true; });
+		setMsg(T.working || 'Trabalhando…', 'working');
+		var data = { post_id: CFG.postId, mode: payload.mode, instructions: payload.instructions, h2: payload.h2 };
+		if (payload.base) { data.base = payload.base; }
+		api('editor_improve', data).then(function (d) {
+			lastDraft = d.draft || '';
+			lastMode = payload.mode;
+			lastApproval = d;
+			renderApproval(d);
+		}).catch(function (e) {
+			buttons.forEach(function (b) { b.disabled = false; });
+			setMsg(e.message || (T.error || 'Erro'), 'error');
+		});
+	}
+
 	function generate(mode) {
 		var ta = overlay.querySelector('.ce61-ed-text');
 		var instructions = ta ? ta.value.trim() : '';
 		lastPrompt = instructions;
+		lastH2 = readH2('.ce61-h2');
 		if (mode === 'combined' && !instructions) {
 			setMsg(T.emptyCombined || '', 'error');
 			ta && ta.focus();
 			return;
 		}
-		var buttons = overlay.querySelectorAll('.ce61-gen');
-		buttons.forEach(function (b) { b.disabled = true; });
 		if (ta) { ta.disabled = true; }
-		setMsg(T.working || 'Trabalhando…', 'working');
-		api('editor_improve', { post_id: CFG.postId, mode: mode, instructions: instructions }).then(function (d) {
-			lastDraft = d.draft || '';
-			lastMode = mode;
-			renderApproval(d);
-		}).catch(function (e) {
-			buttons.forEach(function (b) { b.disabled = false; });
-			if (ta) { ta.disabled = false; }
-			setMsg(e.message || (T.error || 'Erro'), 'error');
-		});
+		runImprove({ mode: mode, instructions: instructions, h2: lastH2 }, '.ce61-gen');
+	}
+
+	function refineGenerate() {
+		var ta = overlay.querySelector('.ce61-refine-text');
+		var instructions = ta ? ta.value.trim() : '';
+		var h2 = readH2('.ce61-refine-h2');
+		if (!instructions) {
+			setMsg(T.refineEmpty || '', 'error');
+			ta && ta.focus();
+			return;
+		}
+		lastH2 = h2;
+		if (ta) { ta.disabled = true; }
+		runImprove({ mode: 'refine', instructions: instructions, h2: h2, base: lastDraft }, '.ce61-refine-gen, .ce61-back');
 	}
 
 	function renderApproval(d) {
@@ -282,11 +316,32 @@
 			'<div class="ce61-draft" tabindex="0">' + (d.preview || '') + '</div>' +
 			'<div class="ce61-ed-msg" aria-live="polite" hidden></div>' +
 			'<div class="ce61-ed-actions">' +
+				'<button type="button" class="button ce61-refine">' + esc(T.refineBtn || '') + '</button>' +
 				'<button type="button" class="button ce61-redo">' + esc(T.redo || '') + '</button>' +
 				'<button type="button" class="button ce61-approve" data-publish="0">' + esc(T.approveDraft || '') + '</button>' +
 				pubBtn +
 			'</div>';
 		mount(body);
+	}
+
+	// Tela de ajuste: refina o rascunho gerado com um novo pedido (mode 'refine').
+	function renderRefine() {
+		var prev = lastApproval && lastApproval.preview ? lastApproval.preview : '';
+		var body =
+			'<p class="ce61-ed-hint">' + esc(T.refineHint || '') + '</p>' +
+			'<h3>' + esc(T.draftTitle || '') + '</h3>' +
+			'<div class="ce61-draft is-compact" tabindex="0">' + prev + '</div>' +
+			'<textarea class="ce61-refine-text" rows="4" placeholder="' + esc(T.refinePlaceholder || '') + '"></textarea>' +
+			'<label class="ce61-h2-field"><span>' + esc(T.h2Label || '') + '</span>' +
+				'<input type="number" class="ce61-refine-h2" min="0" max="12" step="1" placeholder="0" value="' + (lastH2 ? lastH2 : '') + '"></label>' +
+			'<div class="ce61-ed-msg" aria-live="polite" hidden></div>' +
+			'<div class="ce61-ed-actions">' +
+				'<button type="button" class="button ce61-back">' + esc(T.backDraft || '') + '</button>' +
+				'<button type="button" class="button button-primary ce61-refine-gen">' + esc(T.refineGen || '') + '</button>' +
+			'</div>';
+		mount(body);
+		var ta = overlay.querySelector('.ce61-refine-text');
+		setTimeout(function () { ta && ta.focus(); }, 30);
 	}
 
 	function applyDraft(publish) {
@@ -355,6 +410,15 @@
 
 		var redo = e.target.closest ? e.target.closest('.ce61-redo') : null;
 		if (redo) { e.preventDefault(); renderForm(); return; }
+
+		var refine = e.target.closest ? e.target.closest('.ce61-refine') : null;
+		if (refine) { e.preventDefault(); renderRefine(); return; }
+
+		var refineGen = e.target.closest ? e.target.closest('.ce61-refine-gen') : null;
+		if (refineGen) { e.preventDefault(); refineGenerate(); return; }
+
+		var back = e.target.closest ? e.target.closest('.ce61-back') : null;
+		if (back) { e.preventDefault(); if (lastApproval) { renderApproval(lastApproval); } else { renderForm(); } return; }
 
 		var rev = e.target.closest ? e.target.closest('.ce61-log-revert') : null;
 		if (rev) { e.preventDefault(); revertEntry(rev.getAttribute('data-entry'), rev); return; }
