@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.10.0
+Stable tag: 2.11.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.11.0 =
+* Novo: seleção em massa na Auditoria de Schema — marque páginas individualmente ou "Selecionar tudo", escolha a correção (Inserir Article ou Gerar FAQ + schema) e envie todas de uma vez para a Fila de Geração, processadas em segundo plano pelo WP-Cron.
+* Páginas selecionadas que não precisam da correção escolhida são ignoradas automaticamente.
 
 = 2.10.0 =
 * Novo: após gerar ou criar um conteúdo, aparece um botão "Publicar/Agendar" para publicar o que foi criado sem precisar abrir o editor — no formulário de artigo, na geração de CPT e no artigo satélite (gap).

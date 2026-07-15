@@ -220,6 +220,8 @@ class CE61_Queue {
 				return CE61_Creator::job_generate_article( $payload );
 			case 'generate_image':
 				return self::job_generate_image( $payload );
+			case 'schema_fix':
+				return self::job_schema_fix( $payload );
 			default:
 				return new WP_Error( 'ce61_job', sprintf( __( 'Tipo de job desconhecido: %s', 'cluster-engine' ), $type ) );
 		}
@@ -269,5 +271,34 @@ class CE61_Queue {
 			return $attach;
 		}
 		return array( 'attachment_id' => $attach['attachment_id'], 'url' => $attach['url'], 'source' => 'ai' );
+	}
+
+	/**
+	 * Job de correção de schema em massa: insere Article/BlogPosting ou gera
+	 * FAQ + FAQPage via IA, conforme o modo escolhido ao enfileirar. Reaudita
+	 * a página no fim para o painel refletir a correção.
+	 */
+	private static function job_schema_fix( $payload ) {
+		$post_id = isset( $payload['post_id'] ) ? (int) $payload['post_id'] : 0;
+		$mode    = isset( $payload['mode'] ) ? $payload['mode'] : 'article';
+		if ( ! $post_id || ! get_post( $post_id ) ) {
+			return new WP_Error( 'ce61_job', __( 'Post inválido para correção de schema.', 'cluster-engine' ) );
+		}
+
+		if ( 'faq' === $mode ) {
+			$ai = CE61_AI::run( 'faq_schema', $post_id );
+			if ( is_wp_error( $ai ) ) {
+				return $ai;
+			}
+			$result = CE61_Schema::append_html( $post_id, $ai );
+		} else {
+			$result = CE61_Schema::insert_article_schema( $post_id );
+		}
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		CE61_Schema::audit_post( $post_id );
+		return array( 'mode' => $mode, 'status' => is_string( $result ) ? $result : 'inserted' );
 	}
 }

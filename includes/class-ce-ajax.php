@@ -16,7 +16,7 @@ class CE61_Ajax {
 			'scan_index', 'scan_relations', 'scan_cluster', 'scan_finalize',
 			'dashboard', 'clusters', 'cluster_detail', 'links', 'diagnostics', 'keywords', 'report',
 			'ai_run', 'test_ai', 'apply_meta', 'dismiss_relation', 'create_draft', 'insert_link',
-			'merge_apply', 'schema_scan', 'schema_results', 'schema_fix_article', 'schema_fix_faq', 'schema_post_types',
+			'merge_apply', 'schema_scan', 'schema_results', 'schema_fix_article', 'schema_fix_faq', 'schema_post_types', 'schema_queue_add',
 			'headings_preview', 'apply_headings',
 			'images_list', 'image_prompt', 'image_generate', 'images_queue_add',
 			'stock_search', 'stock_apply', 'stock_status',
@@ -637,6 +637,37 @@ class CE61_Ajax {
 		}
 		CE61_Schema::audit_post( $pid );
 		wp_send_json_success( array( 'mode' => 'inserted' ) );
+	}
+
+	/**
+	 * Enfileira correções de schema em massa (Inserir Article ou Gerar FAQ + schema)
+	 * para os posts selecionados, processadas em segundo plano pelo WP-Cron.
+	 */
+	public static function schema_queue_add() {
+		self::guard();
+		$ids  = isset( $_POST['post_ids'] ) ? json_decode( wp_unslash( $_POST['post_ids'] ), true ) : null;
+		$mode = isset( $_POST['mode'] ) ? sanitize_key( $_POST['mode'] ) : 'article';
+		if ( ! in_array( $mode, array( 'article', 'faq' ), true ) ) {
+			$mode = 'article';
+		}
+		if ( ! is_array( $ids ) || ! $ids ) {
+			wp_send_json_error( array( 'message' => __( 'Nenhuma página selecionada.', 'cluster-engine' ) ) );
+		}
+		$label = 'faq' === $mode ? __( 'FAQ + schema', 'cluster-engine' ) : __( 'Inserir Article', 'cluster-engine' );
+		$added = 0;
+		foreach ( array_slice( $ids, 0, 200 ) as $pid ) {
+			$pid = absint( $pid );
+			if ( ! $pid || ! get_post( $pid ) ) {
+				continue;
+			}
+			CE61_Queue::add( 'schema_fix', array(
+				'post_id' => $pid,
+				'mode'    => $mode,
+				'title'   => get_the_title( $pid ) . ' — ' . $label,
+			) );
+			$added++;
+		}
+		wp_send_json_success( array( 'added' => $added ) );
 	}
 
 	/**

@@ -1041,14 +1041,20 @@
 					var cls = /broken|no_schema|no_article|fetch/.test(i) ? 'ce-chip-red' : 'ce-chip-amber';
 					return '<span class="ce-chip ' + cls + '">' + (schemaIssueLabels[i] || i) + '</span>';
 				}).join('') || '<span class="ce-chip ce-chip-green">completo</span>';
+				var canArticle = r.issues.indexOf('no_article_schema') > -1 || r.issues.indexOf('no_schema') > -1;
+				var canFaq = r.issues.indexOf('no_faq_schema') > -1;
 				var actions = '';
-				if (r.issues.indexOf('no_article_schema') > -1 || r.issues.indexOf('no_schema') > -1) {
+				if (canArticle) {
 					actions += '<button class="ce-btn ce-btn-sm" data-fixschema-article="' + r.post_id + '">◈ Inserir Article</button> ';
 				}
-				if (r.issues.indexOf('no_faq_schema') > -1) {
+				if (canFaq) {
 					actions += '<button class="ce-btn ce-btn-sm" data-fixschema-faq="' + r.post_id + '">✍ Gerar FAQ + schema</button>';
 				}
+				var check = (canArticle || canFaq)
+					? '<input type="checkbox" class="ce-schema-sel" value="' + r.post_id + '" data-article="' + (canArticle ? 1 : 0) + '" data-faq="' + (canFaq ? 1 : 0) + '">'
+					: '';
 				return '<tr id="ce-schema-row-' + r.post_id + '">' +
+					'<td style="width:32px;text-align:center">' + check + '</td>' +
 					'<td><a href="' + esc(r.edit) + '" target="_blank" rel="noopener">' + esc(r.title) + '</a></td>' +
 					'<td>' + types + '</td>' +
 					'<td style="max-width:280px">' + issues + '</td>' +
@@ -1058,7 +1064,48 @@
 			box.innerHTML =
 				'<div class="ce-card ce-table-wrap">' +
 				'<p style="margin:0 0 12px"><b style="font-family:var(--ce-display)">' + withIssues + '</b> de ' + d.results.length + ' páginas com pendências de schema</p>' +
-				'<table class="ce-table"><thead><tr><th>Página</th><th>Schema encontrado</th><th>Pendências</th><th>Corrigir</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+				'<div class="ce-net-toolbar" style="margin-bottom:12px">' +
+					'<label class="ce-check"><input type="checkbox" id="ce-schema-selall"> Selecionar tudo</label>' +
+					'<select class="ce-select" id="ce-schema-bulk-mode" style="max-width:240px">' +
+						'<option value="article">◈ Inserir Article (sem IA)</option>' +
+						'<option value="faq">✍ Gerar FAQ + schema (IA)</option>' +
+					'</select>' +
+					'<button class="ce-btn ce-btn-primary ce-btn-sm" id="ce-schema-bulk-go">⧗ Adicionar à fila (<span id="ce-schema-selcount">0</span>)</button>' +
+					'<span class="ce-sub" id="ce-schema-bulk-hint">Marque as páginas e processe as correções em segundo plano pela Fila de Geração</span>' +
+				'</div>' +
+				'<table class="ce-table"><thead><tr><th style="width:32px"></th><th>Página</th><th>Schema encontrado</th><th>Pendências</th><th>Corrigir</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+
+			var goBtn = $('#ce-schema-bulk-go');
+			function schemaSel() { return $$('.ce-schema-sel').filter(function (c) { return c.checked; }); }
+			function refreshSchemaSel() {
+				var n = schemaSel().length;
+				$('#ce-schema-selcount').textContent = n;
+				goBtn.disabled = !n;
+			}
+			goBtn.disabled = true;
+			$('#ce-schema-selall').addEventListener('change', function () {
+				var on = this.checked;
+				$$('.ce-schema-sel').forEach(function (c) { c.checked = on; });
+				refreshSchemaSel();
+			});
+			$$('.ce-schema-sel').forEach(function (c) { c.addEventListener('change', refreshSchemaSel); });
+			goBtn.addEventListener('click', function () {
+				var mode = $('#ce-schema-bulk-mode').value;
+				var attr = mode === 'faq' ? 'faq' : 'article';
+				var picked = schemaSel();
+				var ids = picked.filter(function (c) { return c.dataset[attr] === '1'; }).map(function (c) { return c.value; });
+				var skipped = picked.length - ids.length;
+				if (!ids.length) {
+					toast('Nenhuma das páginas selecionadas precisa dessa correção', true);
+					return;
+				}
+				if (mode === 'faq' && !requireKey()) { return; }
+				goBtn.disabled = true;
+				api('schema_queue_add', { post_ids: JSON.stringify(ids), mode: mode }).then(function (r) {
+					toast(r.added + ' correção(ões) na fila' + (skipped ? ' — ' + skipped + ' ignorada(s) por não precisar' : ''));
+					gotoTab('queue');
+				}).catch(function (e) { goBtn.disabled = false; toast(e.message, true); });
+			});
 		}).catch(function (e) { box.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
 	}
 
