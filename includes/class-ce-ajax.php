@@ -1119,7 +1119,12 @@ class CE61_Ajax {
 
 		$out = array();
 		foreach ( $rows as $r ) {
-			$pid  = (int) $r['post_id'];
+			$pid = (int) $r['post_id'];
+			// Página excluída ou na lixeira: não exibir mais na tabela.
+			$pstatus = get_post_status( $pid );
+			if ( ! $pstatus || 'trash' === $pstatus || 'auto-draft' === $pstatus ) {
+				continue;
+			}
 			$path = untrailingslashit( strtolower( (string) wp_parse_url( get_permalink( $pid ), PHP_URL_PATH ) ) );
 			$idx  = get_post_meta( $pid, '_ce61_index_status', true );
 			$idx  = $idx ? json_decode( $idx, true ) : null;

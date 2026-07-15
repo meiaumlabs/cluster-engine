@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.22.0
+Stable tag: 2.23.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.23.0 =
+* Correção: páginas excluídas (ou na lixeira) não são mais exibidas na tabela de Desempenho nem na Fila de geração — os registros antigos deixam de aparecer automaticamente.
+* Novo: na Fila de geração, os artigos prontos agora mostram o título atual do post, a URL para visualizar e o slug.
+* Melhoria: o status de publicação do artigo (Rascunho/Publicado/Agendado) é lido ao vivo na Fila — após publicar/agendar, o status é atualizado ao recarregar a lista.
 
 = 2.22.0 =
 * Novo: em "Melhorias sugeridas" (modal de IA), agora dá para marcar várias pendências (ou "Selecionar todas") e clicar em "Corrigir selecionadas" para aplicar as correções automáticas em fila, uma a uma, em massa. O andamento é exibido ("Corrigindo 2 de 5…") e a coluna de diagnóstico se atualiza ao final com o resumo.

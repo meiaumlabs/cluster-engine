@@ -88,10 +88,30 @@ class CE61_Queue {
 		$rows = $wpdb->get_results( $wpdb->prepare(
 			"SELECT * FROM {$wpdb->prefix}ce_queue ORDER BY id DESC LIMIT %d", $limit
 		), ARRAY_A );
-		foreach ( $rows as &$r ) {
+		$jobs = array();
+		foreach ( $rows as $r ) {
 			$r['payload'] = json_decode( $r['payload'], true );
 			$r['result']  = $r['result'] ? json_decode( $r['result'], true ) : null;
+
+			// Jobs de artigo concluídos: reflete o estado ATUAL do post
+			// (título, url, slug e status de publicação, que podem ter mudado
+			// desde a geração) e oculta os cujo post foi excluído/lixeira.
+			if ( 'generate_article' === $r['job_type'] && 'done' === $r['status']
+				&& is_array( $r['result'] ) && ! empty( $r['result']['post_id'] ) ) {
+				$pid = (int) $r['result']['post_id'];
+				$st  = get_post_status( $pid );
+				if ( ! $st || 'trash' === $st ) {
+					continue; // página excluída: não exibir mais na fila.
+				}
+				$r['result']['status'] = $st;
+				$r['result']['title']  = get_the_title( $pid );
+				$r['result']['view']   = get_permalink( $pid );
+				$r['result']['slug']   = get_post_field( 'post_name', $pid );
+				$r['result']['edit']   = admin_url( 'post.php?post=' . $pid . '&action=edit' );
+			}
+			$jobs[] = $r;
 		}
+		$rows = $jobs;
 		$counts = array( 'pending' => 0, 'running' => 0, 'done' => 0, 'error' => 0, 'cancelled' => 0 );
 		$agg = $wpdb->get_results( "SELECT status, COUNT(*) c FROM {$wpdb->prefix}ce_queue GROUP BY status", ARRAY_A );
 		foreach ( $agg as $a ) {

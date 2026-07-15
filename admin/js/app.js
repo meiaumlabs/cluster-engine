@@ -2107,6 +2107,20 @@
 				var isImage = 'generate_image' === j.job_type;
 				var title = j.payload && j.payload.title ? j.payload.title
 					: (isImage && j.payload && j.payload.query ? j.payload.query : ('Job #' + j.id));
+				var isArticleDone = !isImage && j.status === 'done' && j.result && j.result.post_id;
+				// Para artigos prontos, mostra o título atual do post (pode ter sido renomeado).
+				if (isArticleDone && j.result.title) { title = j.result.title; }
+				// Linha extra com status de publicação, URL para visualizar e slug.
+				var meta = '';
+				if (isArticleDone) {
+					var vurl = j.result.view || '';
+					var slug = j.result.slug || '';
+					meta = '<div class="ce-sub" style="margin-top:4px;word-break:break-all">' +
+						(j.result.status ? statusChip(j.result.status) + ' ' : '') +
+						(vurl ? '<a href="' + esc(vurl) + '" target="_blank" rel="noopener">' + esc(vurl) + '</a>' : '') +
+						(slug ? ' <span class="ce-chip ce-chip-kw">slug: ' + esc(slug) + '</span>' : '') +
+						'</div>';
+				}
 				var res = '';
 				if (j.status === 'done' && j.result && isImage) {
 					res = '<img src="' + esc(j.result.url) + '" alt="" style="width:56px;height:32px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:6px">' +
@@ -2125,7 +2139,7 @@
 				var scores = ( j.status === 'done' && j.result && j.result.scores ) ? '<br>' + scoresRow(j.result.scores) : '';
 				return '<tr>' +
 					'<td style="width:40px" class="ce-sub">#' + j.id + '</td>' +
-					'<td>' + (isImage ? '🖼 ' : '') + esc(title) + scores + (j.error ? '<br><span class="ce-sub" style="color:var(--ce-red,#c0392b)">' + esc(j.error) + '</span>' : '') + '</td>' +
+					'<td>' + (isImage ? '🖼 ' : '') + esc(title) + meta + scores + (j.error ? '<br><span class="ce-sub" style="color:var(--ce-red,#c0392b)">' + esc(j.error) + '</span>' : '') + '</td>' +
 					'<td style="width:130px">' + queueStatusChip(j.status) + '</td>' +
 					'<td class="ce-sub" style="width:150px">' + esc(j.created_at || '') + '</td>' +
 					'<td style="white-space:nowrap;text-align:right">' + res + cancel + '</td>' +
