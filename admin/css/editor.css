@@ -235,7 +235,9 @@
 	align-items: center;
 	justify-content: space-between;
 	gap: 10px;
+	padding-left: 0;
 }
+.ce61-issues li.ce61-issue:before { content: none; }
 .ce61-issue-txt { flex: 1 1 auto; min-width: 0; }
 .ce61-issue-fix {
 	flex: 0 0 auto;
@@ -272,6 +274,33 @@
 }
 .ce61-diag-msg.is-error { background: #fcf0f1; color: #b32d2e; }
 .ce61-diag-msg.is-ok { background: #edf7ef; color: #1a7f37; }
+.ce61-diag-msg.is-working { background: #f3ecff; color: #6a3fbf; }
+.ce61-diag-msg.is-warn { background: #fcf6e6; color: #8a6d00; }
+
+/* Correção em massa das pendências. */
+.ce61-issues-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+	margin-bottom: 8px;
+	flex-wrap: wrap;
+}
+.ce61-issues-all {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 12px;
+	color: #50575e;
+	cursor: pointer;
+}
+.ce61-issues-fix-sel { font-size: 12px; }
+.ce61-issue-check {
+	flex: 0 0 auto;
+	margin: 0;
+	cursor: pointer;
+}
+.ce61-issue-nocheck { flex: 0 0 auto; width: 13px; }
 
 /* Meta título / meta descrição. */
 .ce61-meta-hint { margin: 0 0 10px; }

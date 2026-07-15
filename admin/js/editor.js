@@ -99,14 +99,29 @@
 			return '<p class="ce61-muted">' + esc(T.issuesNone || '') + '</p>';
 		}
 		var fix = autofixSet(d);
-		return '<ul class="ce61-issues">' + items.map(function (it) {
-			var action = (it.key && fix[it.key])
+		var fixableCount = 0;
+		var list = '<ul class="ce61-issues">' + items.map(function (it) {
+			var fixable = it.key && fix[it.key];
+			if (fixable) { fixableCount++; }
+			var check = fixable
+				? '<input type="checkbox" class="ce61-issue-check" data-issue="' + esc(it.key) + '" aria-label="' + esc(T.fixSelectOne || 'Selecionar') + '">'
+				: '<span class="ce61-issue-nocheck" aria-hidden="true"></span>';
+			var action = fixable
 				? '<button type="button" class="ce61-issue-fix" data-issue="' + esc(it.key) + '">' + esc(T.fixBtn || 'Corrigir') + '</button>'
 				: '<span class="ce61-issue-manual" title="' + esc(T.fixManual || '') + '">' + esc(T.fixManualShort || '') + '</span>';
-			return '<li class="ce61-issue">' +
+			return '<li class="ce61-issue">' + check +
 				'<span class="ce61-issue-txt"><b>[' + esc(it.grp) + ']</b> ' + esc(it.label) + '</span>' +
 				action + '</li>';
 		}).join('') + '</ul>';
+
+		var bar = '';
+		if (fixableCount > 0) {
+			bar = '<div class="ce61-issues-bar">' +
+				'<label class="ce61-issues-all"><input type="checkbox" class="ce61-issue-all"> ' + esc(T.fixSelectAll || 'Selecionar todas') + '</label>' +
+				'<button type="button" class="button button-primary ce61-issues-fix-sel" disabled>' + esc(T.fixSelected || 'Corrigir selecionadas') + '</button>' +
+				'</div>';
+		}
+		return bar + list;
 	}
 
 	function metaBlock(d) {
@@ -278,6 +293,72 @@
 			btn.textContent = prev;
 			diagMsg(e.message || (T.error || 'Erro'), 'error');
 		});
+	}
+
+	// Reflete no botão "Corrigir selecionadas" quantas pendências estão marcadas.
+	function syncIssueSelection() {
+		if (!overlay) { return; }
+		var checks = overlay.querySelectorAll('.ce61-issue-check');
+		var sel = overlay.querySelectorAll('.ce61-issue-check:checked');
+		var btn = overlay.querySelector('.ce61-issues-fix-sel');
+		var all = overlay.querySelector('.ce61-issue-all');
+		if (btn) {
+			btn.disabled = sel.length === 0;
+			var lbl = T.fixSelected || 'Corrigir selecionadas';
+			btn.textContent = sel.length ? lbl + ' (' + sel.length + ')' : lbl;
+		}
+		if (all) {
+			all.checked = checks.length > 0 && sel.length === checks.length;
+			all.indeterminate = sel.length > 0 && sel.length < checks.length;
+		}
+	}
+
+	function toggleAllIssues(on) {
+		if (!overlay) { return; }
+		overlay.querySelectorAll('.ce61-issue-check').forEach(function (c) { c.checked = !!on; });
+		syncIssueSelection();
+	}
+
+	// Corrige em fila (uma por vez) todas as pendências marcadas. Só atualiza a
+	// coluna de diagnóstico ao final, para não perder a seleção durante o lote.
+	function fixSelectedIssues() {
+		if (!overlay) { return; }
+		var keys = [];
+		overlay.querySelectorAll('.ce61-issue-check:checked').forEach(function (c) {
+			var k = c.getAttribute('data-issue');
+			if (k && keys.indexOf(k) === -1) { keys.push(k); }
+		});
+		if (!keys.length) { diagMsg(T.fixSelectNone || '', 'error'); return; }
+
+		var bar = overlay.querySelector('.ce61-issues-bar');
+		var selBtn = overlay.querySelector('.ce61-issues-fix-sel');
+		overlay.querySelectorAll('.ce61-issue-fix, .ce61-issue-check, .ce61-issue-all').forEach(function (b) { b.disabled = true; });
+		if (selBtn) { selBtn.disabled = true; }
+
+		var total = keys.length;
+		var done = 0, ok = 0, fails = [];
+
+		function step() {
+			if (done >= total) {
+				var summary = (T.fixBatchDone || 'Corrigidas {ok}/{total} pendências.')
+					.replace('{ok}', ok).replace('{total}', total);
+				if (fails.length) { summary += ' ' + (T.fixBatchFails || 'Falhas:') + ' ' + fails.join('; '); }
+				refreshDiag(summary, fails.length ? (ok ? 'warn' : 'error') : 'ok');
+				return;
+			}
+			var key = keys[done];
+			diagMsg((T.fixBatchProgress || 'Corrigindo {n} de {total}…').replace('{n}', done + 1).replace('{total}', total), 'working');
+			api('editor_fix', { post_id: CFG.postId, task: 'issue', key: key }).then(function (d) {
+				if (d.diag) { diagData = d.diag; }
+				ok++;
+			}).catch(function (e) {
+				fails.push(e.message || key);
+			}).then(function () {
+				done++;
+				step();
+			});
+		}
+		step();
 	}
 
 	/* ---------- Modal ---------- */
@@ -561,6 +642,15 @@
 
 		var issueFix = e.target.closest ? e.target.closest('.ce61-issue-fix') : null;
 		if (issueFix) { e.preventDefault(); fixIssue(issueFix.getAttribute('data-issue'), issueFix); return; }
+
+		var issueAll = e.target.closest ? e.target.closest('.ce61-issue-all') : null;
+		if (issueAll) { toggleAllIssues(issueAll.checked); return; }
+
+		var issueCheck = e.target.closest ? e.target.closest('.ce61-issue-check') : null;
+		if (issueCheck) { syncIssueSelection(); return; }
+
+		var fixSel = e.target.closest ? e.target.closest('.ce61-issues-fix-sel') : null;
+		if (fixSel) { e.preventDefault(); fixSelectedIssues(); return; }
 	});
 
 	/* ---------- Imagem destacada ---------- */
