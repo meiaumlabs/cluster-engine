@@ -125,17 +125,96 @@ class CE61_Schema {
 	}
 
 	/**
-	 * Audit a batch of indexed posts. Returns [done, total].
+	 * Tipos de conteúdo (post types) presentes no índice, com contagem,
+	 * para o usuário escolher o que auditar antes de rodar a fila.
 	 */
-	public static function audit_batch( $offset, $size = 5 ) {
+	public static function indexed_post_types() {
 		global $wpdb;
-		$ids   = $wpdb->get_col( "SELECT post_id FROM {$wpdb->prefix}ce_index ORDER BY post_id ASC" );
+		$rows = $wpdb->get_results(
+			"SELECT p.post_type AS type, COUNT(*) AS n
+			 FROM {$wpdb->prefix}ce_index i
+			 JOIN {$wpdb->posts} p ON p.ID = i.post_id
+			 GROUP BY p.post_type ORDER BY n DESC",
+			ARRAY_A
+		);
+		$out = array();
+		foreach ( $rows as $r ) {
+			$obj   = get_post_type_object( $r['type'] );
+			$out[] = array(
+				'type'  => $r['type'],
+				'label' => $obj ? $obj->labels->name : $r['type'],
+				'count' => (int) $r['n'],
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Monta a lista estável de IDs a auditar, filtrando por post types e,
+	 * opcionalmente, pulando páginas já auditadas nos últimos N dias.
+	 */
+	private static function build_audit_queue( $types, $skip_recent_days ) {
+		global $wpdb;
+		$where  = '';
+		$params = array();
+		if ( ! empty( $types ) ) {
+			$place  = implode( ',', array_fill( 0, count( $types ), '%s' ) );
+			$where  = "WHERE p.post_type IN ($place)";
+			$params = $types;
+		}
+		$sql = "SELECT i.post_id FROM {$wpdb->prefix}ce_index i
+				JOIN {$wpdb->posts} p ON p.ID = i.post_id
+				$where ORDER BY i.post_id ASC";
+		$ids = $params
+			? $wpdb->get_col( $wpdb->prepare( $sql, $params ) ) // phpcs:ignore WordPress.DB.PreparedSQL
+			: $wpdb->get_col( $sql );
+		$ids = array_map( 'intval', $ids );
+
+		if ( $skip_recent_days > 0 ) {
+			$cutoff = time() - ( $skip_recent_days * DAY_IN_SECONDS );
+			$ids    = array_values( array_filter( $ids, function ( $id ) use ( $cutoff ) {
+				$meta = get_post_meta( $id, '_ce61_schema_audit', true );
+				if ( ! $meta ) {
+					return true; // nunca auditado.
+				}
+				$audit = json_decode( $meta, true );
+				if ( ! is_array( $audit ) || empty( $audit['checked_at'] ) ) {
+					return true;
+				}
+				return strtotime( $audit['checked_at'] ) < $cutoff;
+			} ) );
+		}
+		return $ids;
+	}
+
+	/**
+	 * Audita um lote de posts. Na primeira chamada (offset 0) monta e congela a
+	 * fila num transient, para a paginação permanecer estável mesmo com filtros
+	 * (post types, pular já auditadas). Retorna [done, total].
+	 */
+	public static function audit_batch( $offset, $size = 5, $types = array(), $skip_recent_days = 0 ) {
+		$key = 'ce61_schema_queue';
+		if ( 0 === (int) $offset ) {
+			$ids = self::build_audit_queue( $types, $skip_recent_days );
+			set_transient( $key, $ids, HOUR_IN_SECONDS );
+		} else {
+			$ids = get_transient( $key );
+			if ( ! is_array( $ids ) ) {
+				$ids = self::build_audit_queue( $types, $skip_recent_days );
+			}
+		}
+
 		$total = count( $ids );
 		$slice = array_slice( $ids, $offset, $size );
 		foreach ( $slice as $id ) {
 			self::audit_post( (int) $id );
 		}
-		return array( 'done' => min( $offset + $size, $total ), 'total' => $total );
+
+		$done = min( $offset + $size, $total );
+		if ( $done >= $total ) {
+			delete_transient( $key );
+		}
+		return array( 'done' => $done, 'total' => $total );
 	}
 
 	/**

@@ -964,23 +964,30 @@
 		el.innerHTML =
 			'<div class="ce-section"><h2 class="ce-h2">Auditoria de Schema (dados estruturados)</h2>' +
 			'<p class="ce-sub">O plugin abre cada página publicada, lê o JSON-LD renderizado (incluindo o que seu plugin de SEO gera) e aponta o que está quebrado ou faltando. As correções são inseridas direto no post.</p>' +
-			'<p><button class="ce-btn ce-btn-primary" id="ce-schema-scan">Auditar schema das páginas</button></p>' +
+			'<div class="ce-card" id="ce-schema-types" style="margin-bottom:12px"><div class="ce-loading">Carregando tipos de conteúdo</div></div>' +
+			'<p><button class="ce-btn ce-btn-primary" id="ce-schema-scan">Auditar schema das páginas selecionadas</button></p>' +
 			'<div class="ce-scanbar" id="ce-schema-bar" hidden><div class="ce-scanbar-track"><div class="ce-scanbar-fill" id="ce-schema-fill"></div></div><p id="ce-schema-msg"></p></div>' +
 			'</div><div id="ce-schema-results"><div class="ce-loading">Carregando resultados anteriores</div></div>';
 
+		loadSchemaTypes();
+
 		$('#ce-schema-scan').addEventListener('click', function () {
 			var btn = $('#ce-schema-scan'), bar = $('#ce-schema-bar'), fill = $('#ce-schema-fill'), msg = $('#ce-schema-msg');
+			var types = [];
+			$$('.ce-schema-type').forEach(function (c) { if (c.checked) { types.push(c.value); } });
+			if (!types.length) { toast('Selecione ao menos um tipo de conteúdo para auditar', true); return; }
+			var skip = ($('#ce-schema-skip') && $('#ce-schema-skip').checked) ? 7 : 0;
 			btn.disabled = true;
 			bar.hidden = false;
 			(function step(offset) {
-				api('schema_scan', { offset: offset }).then(function (d) {
+				api('schema_scan', { offset: offset, types: JSON.stringify(types), skip_recent: skip }).then(function (d) {
 					var pct = d.total ? (d.done / d.total) * 100 : 100;
 					fill.style.width = pct + '%';
 					msg.textContent = 'Lendo páginas ' + d.done + '/' + d.total + ' (cada página é aberta e analisada)';
 					if (d.done < d.total) { step(d.done); } else {
-						msg.textContent = 'Auditoria concluída.';
+						msg.textContent = d.total ? 'Auditoria concluída.' : 'Nada a auditar — as páginas já foram verificadas recentemente.';
 						btn.disabled = false;
-						setTimeout(function () { bar.hidden = true; }, 800);
+						setTimeout(function () { bar.hidden = true; }, 1200);
 						loadSchemaResults();
 					}
 				}).catch(function (e) {
@@ -991,6 +998,25 @@
 			})(0);
 		});
 		loadSchemaResults();
+	}
+
+	function loadSchemaTypes() {
+		var box = $('#ce-schema-types');
+		if (!box) { return; }
+		api('schema_post_types', {}).then(function (d) {
+			if (!d.types || !d.types.length) {
+				box.innerHTML = '<p class="ce-sub" style="margin:0">Nada indexado ainda. Rode um “Escanear site” no Painel primeiro.</p>';
+				return;
+			}
+			box.innerHTML =
+				'<p style="margin:0 0 10px"><b style="font-family:var(--ce-display)">Tipos de conteúdo a auditar</b> <span class="ce-sub">— selecione só o que precisa; menos páginas = menos tempo e tokens</span></p>' +
+				'<div style="display:flex;flex-wrap:wrap">' +
+				d.types.map(function (t) {
+					return '<label class="ce-check"><input type="checkbox" class="ce-schema-type" value="' + esc(t.type) + '" checked> ' + esc(t.label) + ' <span class="ce-sub">(' + t.count + ')</span></label>';
+				}).join('') +
+				'</div>' +
+				'<label class="ce-check" style="margin-top:6px"><input type="checkbox" id="ce-schema-skip" checked> Pular páginas já auditadas nos últimos 7 dias</label>';
+		}).catch(function (e) { box.innerHTML = '<p class="ce-sub">' + esc(e.message) + '</p>'; });
 	}
 
 	function loadSchemaResults() {

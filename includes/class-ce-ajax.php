@@ -16,7 +16,7 @@ class CE61_Ajax {
 			'scan_index', 'scan_relations', 'scan_cluster', 'scan_finalize',
 			'dashboard', 'clusters', 'cluster_detail', 'links', 'diagnostics', 'keywords', 'report',
 			'ai_run', 'test_ai', 'apply_meta', 'dismiss_relation', 'create_draft', 'insert_link',
-			'merge_apply', 'schema_scan', 'schema_results', 'schema_fix_article', 'schema_fix_faq',
+			'merge_apply', 'schema_scan', 'schema_results', 'schema_fix_article', 'schema_fix_faq', 'schema_post_types',
 			'headings_preview', 'apply_headings',
 			'images_list', 'image_prompt', 'image_generate', 'images_queue_add',
 			'stock_search', 'stock_apply', 'stock_status',
@@ -589,10 +589,23 @@ class CE61_Ajax {
 
 	/* ---------- Schema module ---------- */
 
+	public static function schema_post_types() {
+		self::guard();
+		wp_send_json_success( array( 'types' => CE61_Schema::indexed_post_types() ) );
+	}
+
 	public static function schema_scan() {
 		self::guard();
 		$offset = isset( $_POST['offset'] ) ? absint( $_POST['offset'] ) : 0;
-		wp_send_json_success( CE61_Schema::audit_batch( $offset, 5 ) );
+		$types  = array();
+		if ( isset( $_POST['types'] ) ) {
+			$decoded = json_decode( wp_unslash( $_POST['types'] ), true );
+			if ( is_array( $decoded ) ) {
+				$types = array_map( 'sanitize_key', $decoded );
+			}
+		}
+		$skip_recent = isset( $_POST['skip_recent'] ) ? absint( $_POST['skip_recent'] ) : 0;
+		wp_send_json_success( CE61_Schema::audit_batch( $offset, 5, $types, $skip_recent ) );
 	}
 
 	public static function schema_results() {
