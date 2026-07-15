@@ -1,0 +1,134 @@
+/* Cluster Engine — extensão no editor (barra superior, meta box, imagem destacada). */
+
+/* Ícone na barra superior do admin. */
+#wp-admin-bar-ce61-ai .ce61-ab-icon {
+	font-family: dashicons;
+	font-size: 18px;
+	line-height: 1;
+	vertical-align: middle;
+	margin-right: 4px;
+	color: #c9a3ff;
+}
+#wp-admin-bar-ce61-ai > .ab-item {
+	display: flex;
+	align-items: center;
+}
+
+/* Meta box abaixo do bloco Publicar. */
+.ce61-box .ce61-box-hint {
+	margin: 0 0 10px;
+	color: #50575e;
+	font-size: 12px;
+	line-height: 1.5;
+}
+.ce61-box-btn {
+	width: 100%;
+	display: inline-flex !important;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+}
+.ce61-box-btn .dashicons {
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+	line-height: 1;
+}
+
+/* Botão de gerar imagem destacada com IA. */
+.ce61-featured-ai {
+	margin: 10px 0 2px;
+}
+.ce61-featured-btn {
+	display: inline-flex !important;
+	align-items: center;
+	gap: 4px;
+}
+.ce61-featured-btn .dashicons {
+	font-size: 17px;
+	width: 17px;
+	height: 17px;
+	line-height: 1;
+}
+.ce61-featured-status {
+	display: block;
+	margin-top: 6px;
+	font-size: 12px;
+	color: #50575e;
+}
+.ce61-featured-status.is-working { color: #7a52c7; }
+.ce61-featured-status.is-error { color: #b32d2e; }
+.ce61-featured-status.is-ok { color: #1a7f37; }
+
+/* Modal de melhoria de conteúdo. */
+.ce61-ed-overlay {
+	position: fixed;
+	inset: 0;
+	z-index: 100050;
+	background: rgba(15, 12, 25, 0.55);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+}
+.ce61-ed-modal {
+	position: relative;
+	width: 100%;
+	max-width: 560px;
+	background: #fff;
+	border-radius: 12px;
+	box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+	padding: 26px 26px 22px;
+	max-height: 90vh;
+	overflow: auto;
+	box-sizing: border-box;
+}
+.ce61-ed-close {
+	position: absolute;
+	top: 10px;
+	right: 12px;
+	border: 0;
+	background: transparent;
+	font-size: 24px;
+	line-height: 1;
+	cursor: pointer;
+	color: #646970;
+}
+.ce61-ed-close:hover { color: #1d2327; }
+.ce61-ed-title {
+	margin: 0 0 8px;
+	font-size: 18px;
+	color: #1d2327;
+}
+.ce61-ed-hint {
+	margin: 0 0 14px;
+	color: #50575e;
+	font-size: 13px;
+	line-height: 1.55;
+}
+.ce61-ed-text {
+	width: 100%;
+	box-sizing: border-box;
+	resize: vertical;
+	font-size: 14px;
+	line-height: 1.5;
+	padding: 10px 12px;
+	border-radius: 8px;
+}
+.ce61-ed-msg {
+	margin: 12px 0 0;
+	font-size: 13px;
+	padding: 10px 12px;
+	border-radius: 8px;
+	background: #f0f0f1;
+	color: #3c434a;
+}
+.ce61-ed-msg.is-working { background: #f3ecff; color: #6a3fbf; }
+.ce61-ed-msg.is-error { background: #fcf0f1; color: #b32d2e; }
+.ce61-ed-msg.is-ok { background: #edf7ef; color: #1a7f37; }
+.ce61-ed-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+	margin-top: 18px;
+}

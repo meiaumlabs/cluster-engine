@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.14.0
+Stable tag: 2.15.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.15.0 =
+* Novo: extensão do Cluster Engine no editor. Um ícone de IA na barra superior do admin abre um modal onde você descreve o que precisa ser atualizado — a IA reescreve e melhora o conteúdo do post/página mantendo o assunto e a base de configuração do site, usando o conhecimento que já tem.
+* Novo: meta box "Cluster Engine — Conteúdo com IA" abaixo do bloco Publicar, com o mesmo botão de melhorar conteúdo com IA sem sair do editor.
+* Novo: botão "Gerar imagem com IA" dentro da caixa de imagem destacada, que gera e define a imagem destacada com o hub de imagens do plugin.
 
 = 2.14.0 =
 * Correção: a propriedade do Search Console do tipo Domínio (`sc-domain:seusite.com.br`) não era salva em Integrações — o `esc_url_raw()` apagava o valor por não ser uma URL http(s). Agora o prefixo `sc-domain:` é preservado e a conexão com o Search Console se mantém após selecionar a propriedade.

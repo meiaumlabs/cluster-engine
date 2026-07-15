@@ -3,7 +3,7 @@
  * Plugin Name:       Cluster Engine — Autoridade Tópica & Linkagem Interna
  * Plugin URI:        https://61labs.com.br/cluster-engine
  * Description:       Motor de autoridade tópica: mapeia clusters de conteúdo, palavras-chave, diagnostica SEO/AEO/GEO, sugere e corrige linkagem interna e reescreve metadados com IA. Desenvolvido pela 61 Labs.
- * Version:           2.14.0
+ * Version:           2.15.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            61 Labs
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CE61_VERSION', '2.14.0' );
+define( 'CE61_VERSION', '2.15.0' );
 define( 'CE61_FILE', __FILE__ );
 define( 'CE61_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CE61_URL', plugin_dir_url( __FILE__ ) );
@@ -76,6 +76,7 @@ require_once CE61_DIR . 'includes/class-ce-cpt.php';
 require_once CE61_DIR . 'includes/class-ce-queue.php';
 require_once CE61_DIR . 'includes/class-ce-ajax.php';
 require_once CE61_DIR . 'includes/class-ce-admin.php';
+require_once CE61_DIR . 'includes/class-ce-editor.php';
 
 /**
  * 301 redirect engine: old URLs of merged posts → the unified post.
@@ -272,4 +273,5 @@ add_action( 'plugins_loaded', function () {
 	CE61_Ajax::init();
 	CE61_Queue::init();
 	CE61_History::init();
+	CE61_Editor::init();
 } );

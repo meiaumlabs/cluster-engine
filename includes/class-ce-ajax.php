@@ -23,6 +23,7 @@ class CE61_Ajax {
 			'save_settings', 'save_prompts', 'reset_prompt', 'rename_cluster', 'set_pillar',
 			'creator_data', 'suggest_clusters', 'create_cluster', 'delete_cluster',
 			'cluster_plan', 'remove_topic', 'generate_now', 'improve_prompt', 'ai_posts_list', 'post_eeat', 'set_publish', 'creator_fix_issue',
+			'editor_improve',
 			'queue_add', 'queue_list', 'queue_cancel', 'queue_retry', 'queue_clear', 'queue_run_now',
 			'performance_data', 'performance_refresh_batch', 'performance_serp_one', 'index_status_batch', 'index_request_batch',
 			'performance_history', 'performance_insight', 'performance_insight_save', 'performance_insight_list', 'performance_insight_delete',
@@ -989,8 +990,9 @@ class CE61_Ajax {
 			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
 		}
 		wp_send_json_success( array(
-			'url'   => $result['url'],
-			'thumb' => get_the_post_thumbnail_url( $pid, 'medium' ),
+			'url'           => $result['url'],
+			'thumb'         => get_the_post_thumbnail_url( $pid, 'medium' ),
+			'attachment_id' => isset( $result['attachment_id'] ) ? (int) $result['attachment_id'] : 0,
 		) );
 	}
 
@@ -1873,6 +1875,62 @@ class CE61_Ajax {
 		$scores = CE61_Creator::analyze_scores( $pid );
 		update_post_meta( $pid, '_ce61_scores', wp_json_encode( $scores, JSON_UNESCAPED_UNICODE ) );
 		wp_send_json_success( array( 'scores' => $scores ) );
+	}
+
+	/**
+	 * Melhora com IA o conteúdo de UM post/página existente a partir das
+	 * instruções do usuário (o que precisa ser atualizado), mantendo a base
+	 * de configuração do site (global prompt aplicado como system) e o assunto.
+	 * Sobrescreve o post_content com o HTML retornado e recalcula as notas.
+	 */
+	public static function editor_improve() {
+		self::guard();
+		@set_time_limit( 120 );
+		$pid          = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$instructions = isset( $_POST['instructions'] ) ? sanitize_textarea_field( wp_unslash( $_POST['instructions'] ) ) : '';
+		$post         = $pid ? get_post( $pid ) : null;
+		if ( ! $post ) {
+			wp_send_json_error( array( 'message' => __( 'Post não encontrado.', 'cluster-engine' ) ) );
+		}
+		if ( ! current_user_can( 'edit_post', $pid ) ) {
+			wp_send_json_error( array( 'message' => __( 'Sem permissão para editar este conteúdo.', 'cluster-engine' ) ), 403 );
+		}
+		if ( '' === trim( $instructions ) ) {
+			wp_send_json_error( array( 'message' => __( 'Descreva o que precisa ser atualizado no conteúdo.', 'cluster-engine' ) ) );
+		}
+
+		$content_html = mb_substr( (string) $post->post_content, 0, 12000 );
+		$ai = CE61_AI::run( 'improve_post', $pid, array(
+			'instructions' => $instructions,
+			'content_html' => $content_html,
+		) );
+		if ( is_wp_error( $ai ) ) {
+			wp_send_json_error( array( 'message' => $ai->get_error_message() ) );
+		}
+		$html = trim( (string) $ai );
+		$html = preg_replace( '/^```(?:html)?\s*/i', '', $html );
+		$html = preg_replace( '/\s*```$/', '', $html );
+		$html = trim( $html );
+		if ( '' === $html ) {
+			wp_send_json_error( array( 'message' => __( 'A IA não retornou conteúdo utilizável.', 'cluster-engine' ) ) );
+		}
+
+		$upd = wp_update_post( array( 'ID' => $pid, 'post_content' => wp_slash( $html ) ), true );
+		if ( is_wp_error( $upd ) ) {
+			wp_send_json_error( array( 'message' => $upd->get_error_message() ) );
+		}
+
+		// Recalcula notas E-E-A-T/AEO/GEO (a classe existe no plugin).
+		if ( class_exists( 'CE61_Creator' ) && method_exists( 'CE61_Creator', 'analyze_scores' ) ) {
+			$scores = CE61_Creator::analyze_scores( $pid );
+			update_post_meta( $pid, '_ce61_scores', wp_json_encode( $scores, JSON_UNESCAPED_UNICODE ) );
+		}
+
+		wp_send_json_success( array(
+			'message'  => __( 'Conteúdo atualizado com IA.', 'cluster-engine' ),
+			'content'  => $html,
+			'edit_url' => get_edit_post_link( $pid, 'raw' ),
+		) );
 	}
 
 	/**
