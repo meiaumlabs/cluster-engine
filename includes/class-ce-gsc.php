@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class CE61_Gsc {
 
 	const OPT   = 'ce61_google';
-	const SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/analytics.readonly';
+	const SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/indexing';
 
 	public static function data() {
 		$d = get_option( self::OPT, array() );
@@ -82,6 +82,9 @@ class CE61_Gsc {
 		$d['expires_at']    = time() + ( isset( $body['expires_in'] ) ? (int) $body['expires_in'] : 3600 ) - 60;
 		if ( ! empty( $body['refresh_token'] ) ) {
 			$d['refresh_token'] = $body['refresh_token']; // só vem na primeira autorização (prompt=consent garante isso).
+		}
+		if ( isset( $body['scope'] ) ) {
+			$d['scopes'] = $body['scope']; // escopos realmente concedidos, para saber se o de indexação está ativo.
 		}
 		self::save( $d );
 		return true;
@@ -296,6 +299,96 @@ class CE61_Gsc {
 			$out[ $path ] = isset( $row['metricValues'][0]['value'] ) ? (int) $row['metricValues'][0]['value'] : 0;
 		}
 		return $out;
+	}
+
+	/**
+	 * Verdadeiro se a conta conectada concedeu o escopo de indexação
+	 * (Indexing API). Usuários que conectaram antes desse recurso precisam
+	 * reconectar para o escopo passar a constar.
+	 */
+	public static function has_indexing_scope() {
+		$d = self::data();
+		return ! empty( $d['scopes'] ) && false !== strpos( $d['scopes'], 'auth/indexing' );
+	}
+
+	/**
+	 * URL Inspection API: estado de indexação de uma URL no índice do Google.
+	 * Retorna [ state => 'indexed'|'not_indexed'|'unknown', coverage, verdict, last_crawl ]
+	 * ou WP_Error.
+	 */
+	public static function inspect_url( $url ) {
+		$d = self::data();
+		if ( empty( $d['gsc_site_url'] ) ) {
+			return new WP_Error( 'ce61_gsc', __( 'Defina a propriedade do Search Console em Configurações → Integrações.', 'cluster-engine' ) );
+		}
+		$token = self::access_token();
+		if ( is_wp_error( $token ) ) {
+			return $token;
+		}
+		$res = wp_remote_post( 'https://searchconsole.googleapis.com/v1/urlInspection/index:inspect', array(
+			'timeout' => 25,
+			'headers' => array( 'Authorization' => 'Bearer ' . $token, 'Content-Type' => 'application/json' ),
+			'body'    => wp_json_encode( array(
+				'inspectionUrl' => $url,
+				'siteUrl'       => $d['gsc_site_url'],
+			) ),
+		) );
+		if ( is_wp_error( $res ) ) {
+			return $res;
+		}
+		$code = wp_remote_retrieve_response_code( $res );
+		$body = json_decode( wp_remote_retrieve_body( $res ), true );
+		if ( 200 !== $code ) {
+			return new WP_Error( 'ce61_gsc', isset( $body['error']['message'] ) ? $body['error']['message'] : ( 'URL Inspection HTTP ' . $code ) );
+		}
+		$idx      = isset( $body['inspectionResult']['indexStatusResult'] ) ? $body['inspectionResult']['indexStatusResult'] : array();
+		$verdict  = isset( $idx['verdict'] ) ? $idx['verdict'] : 'VERDICT_UNSPECIFIED';
+		$coverage = isset( $idx['coverageState'] ) ? $idx['coverageState'] : '';
+		$state    = 'unknown';
+		if ( 'PASS' === $verdict ) {
+			$state = 'indexed';
+		} elseif ( in_array( $verdict, array( 'FAIL', 'PARTIAL', 'NEUTRAL' ), true ) ) {
+			$state = 'not_indexed';
+		}
+		return array(
+			'state'      => $state,
+			'coverage'   => $coverage,
+			'verdict'    => $verdict,
+			'last_crawl' => isset( $idx['lastCrawlTime'] ) ? $idx['lastCrawlTime'] : '',
+		);
+	}
+
+	/**
+	 * Indexing API: notifica o Google de que uma URL foi criada/atualizada.
+	 * ATENÇÃO: oficialmente o Google só suporta este endpoint para páginas
+	 * com schema JobPosting ou BroadcastEvent; para páginas comuns funciona
+	 * na prática mas está fora do suporte oficial. Requer o escopo de indexação.
+	 */
+	public static function request_indexing( $url ) {
+		$token = self::access_token();
+		if ( is_wp_error( $token ) ) {
+			return $token;
+		}
+		if ( ! self::has_indexing_scope() ) {
+			return new WP_Error( 'ce61_indexing_scope', __( 'Reconecte o Google em Integrações para habilitar o envio de indexação (novo escopo).', 'cluster-engine' ) );
+		}
+		$res = wp_remote_post( 'https://indexing.googleapis.com/v3/urlNotifications:publish', array(
+			'timeout' => 25,
+			'headers' => array( 'Authorization' => 'Bearer ' . $token, 'Content-Type' => 'application/json' ),
+			'body'    => wp_json_encode( array(
+				'url'  => $url,
+				'type' => 'URL_UPDATED',
+			) ),
+		) );
+		if ( is_wp_error( $res ) ) {
+			return $res;
+		}
+		$code = wp_remote_retrieve_response_code( $res );
+		$body = json_decode( wp_remote_retrieve_body( $res ), true );
+		if ( 200 !== $code ) {
+			return new WP_Error( 'ce61_indexing', isset( $body['error']['message'] ) ? $body['error']['message'] : ( 'Indexing API HTTP ' . $code ) );
+		}
+		return true;
 	}
 }
 

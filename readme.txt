@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.12.0
+Stable tag: 2.13.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.13.0 =
+* Novo: coluna "Status índice" na página de Desempenho — mostra se cada URL está Indexada, Não indexada ou Desconhecida no Google, via URL Inspection API do Search Console, com botão "Checar indexação (lote)".
+* Novo: seleção em massa + botão "Solicitar indexação" que envia as URLs marcadas para a Indexing API do Google. Requer reconectar o Google (novo escopo de indexação) e ativar a Indexing API no Google Cloud; o Google só garante suporte oficial a páginas com schema JobPosting/BroadcastEvent.
+* Novo: ordenação "Índice — não indexados primeiro" na página de Desempenho.
 
 = 2.12.0 =
 * Novo: em "Ver ajustes" (Criação de Conteúdo), cada ajuste de E-E-A-T/AEO/GEO com correção automática ganha um botão "Corrigir" — gera FAQ, parágrafo de abertura (answer capsule), meta description ou imagem destacada com IA, direto no post, e recalcula as notas na hora.

@@ -24,7 +24,7 @@ class CE61_Ajax {
 			'creator_data', 'suggest_clusters', 'create_cluster', 'delete_cluster',
 			'cluster_plan', 'remove_topic', 'generate_now', 'improve_prompt', 'ai_posts_list', 'post_eeat', 'set_publish', 'creator_fix_issue',
 			'queue_add', 'queue_list', 'queue_cancel', 'queue_retry', 'queue_clear', 'queue_run_now',
-			'performance_data', 'performance_refresh_batch', 'performance_serp_one',
+			'performance_data', 'performance_refresh_batch', 'performance_serp_one', 'index_status_batch', 'index_request_batch',
 			'performance_history', 'performance_insight', 'performance_insight_save', 'performance_insight_list', 'performance_insight_delete',
 			'google_status', 'google_disconnect', 'google_list_sites', 'google_list_ga4', 'google_test_gsc', 'google_test_ga4',
 			'keyword_network',
@@ -1101,6 +1101,8 @@ class CE61_Ajax {
 		foreach ( $rows as $r ) {
 			$pid  = (int) $r['post_id'];
 			$path = untrailingslashit( strtolower( (string) wp_parse_url( get_permalink( $pid ), PHP_URL_PATH ) ) );
+			$idx  = get_post_meta( $pid, '_ce61_index_status', true );
+			$idx  = $idx ? json_decode( $idx, true ) : null;
 			$out[] = array(
 				'post_id'      => $pid,
 				'title'        => $r['title'],
@@ -1111,16 +1113,95 @@ class CE61_Ajax {
 				'serp'         => CE61_Serp::get_cached( $pid ),
 				'gsc'          => isset( $gsc_data[ $path ] ) ? $gsc_data[ $path ] : null,
 				'ga4_sessions' => isset( $ga4_data[ $path ] ) ? $ga4_data[ $path ] : null,
+				'index'        => is_array( $idx ) ? $idx : null,
 			);
 		}
 
 		wp_send_json_success( array(
 			'posts'            => $out,
 			'google_connected' => CE61_Gsc::is_connected(),
+			'indexing_scope'   => CE61_Gsc::has_indexing_scope(),
 			'gsc_updated'      => isset( $gsc['ts'] ) ? $gsc['ts'] : '',
 			'ga4_updated'      => isset( $ga4['ts'] ) ? $ga4['ts'] : '',
 			'has_serp'         => CE61_Serp::has_key(),
 			'serp_provider'    => CE61_Serp::provider_names()[ CE61_Serp::active_provider() ],
+		) );
+	}
+
+	/**
+	 * Checa em lote o estado de indexação (URL Inspection API), guardando o
+	 * resultado em postmeta _ce61_index_status. Lotes pequenos por causa da
+	 * cota da API (2.000/dia, 600/min por propriedade). Retorna done/total.
+	 */
+	public static function index_status_batch() {
+		self::guard();
+		if ( ! CE61_Gsc::is_connected() ) {
+			wp_send_json_error( array( 'message' => __( 'Conecte o Google Search Console em Integrações.', 'cluster-engine' ) ) );
+		}
+		global $wpdb;
+		$offset = isset( $_POST['offset'] ) ? absint( $_POST['offset'] ) : 0;
+		$ids    = array_map( 'intval', $wpdb->get_col( "SELECT post_id FROM {$wpdb->prefix}ce_index ORDER BY post_id ASC" ) );
+		$total  = count( $ids );
+		$size   = 5;
+		$notes  = array();
+		$slice  = array_slice( $ids, $offset, $size );
+		foreach ( $slice as $pid ) {
+			$url = get_permalink( $pid );
+			if ( ! $url ) {
+				continue;
+			}
+			$r = CE61_Gsc::inspect_url( $url );
+			if ( is_wp_error( $r ) ) {
+				$notes[] = $r->get_error_message();
+				continue;
+			}
+			$r['checked_at'] = current_time( 'mysql' );
+			update_post_meta( $pid, '_ce61_index_status', wp_json_encode( $r, JSON_UNESCAPED_UNICODE ) );
+		}
+		wp_send_json_success( array(
+			'done'  => min( $offset + $size, $total ),
+			'total' => $total,
+			'notes' => array_slice( array_unique( $notes ), 0, 3 ),
+		) );
+	}
+
+	/**
+	 * Solicita indexação em massa (Indexing API) para os posts selecionados.
+	 * Reaudita o estado logo após, para o painel refletir. Retorna contadores.
+	 */
+	public static function index_request_batch() {
+		self::guard();
+		if ( ! CE61_Gsc::is_connected() ) {
+			wp_send_json_error( array( 'message' => __( 'Conecte o Google Search Console em Integrações.', 'cluster-engine' ) ) );
+		}
+		if ( ! CE61_Gsc::has_indexing_scope() ) {
+			wp_send_json_error( array( 'message' => __( 'Reconecte o Google em Integrações para habilitar o envio de indexação (novo escopo).', 'cluster-engine' ) ) );
+		}
+		$ids = isset( $_POST['post_ids'] ) ? json_decode( wp_unslash( $_POST['post_ids'] ), true ) : null;
+		if ( ! is_array( $ids ) || ! $ids ) {
+			wp_send_json_error( array( 'message' => __( 'Nenhuma página selecionada.', 'cluster-engine' ) ) );
+		}
+		$sent  = 0;
+		$fail  = 0;
+		$notes = array();
+		foreach ( array_slice( $ids, 0, 100 ) as $pid ) {
+			$pid = absint( $pid );
+			$url = $pid ? get_permalink( $pid ) : '';
+			if ( ! $url ) {
+				continue;
+			}
+			$r = CE61_Gsc::request_indexing( $url );
+			if ( is_wp_error( $r ) ) {
+				$fail++;
+				$notes[] = $r->get_error_message();
+			} else {
+				$sent++;
+			}
+		}
+		wp_send_json_success( array(
+			'sent'  => $sent,
+			'fail'  => $fail,
+			'notes' => array_slice( array_unique( $notes ), 0, 3 ),
 		) );
 	}
 

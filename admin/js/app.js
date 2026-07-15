@@ -2712,17 +2712,18 @@
 
 					'<div class="ce-option" style="cursor:default;display:block">' +
 						'<p><b>2. Ative as APIs necessárias</b></p>' +
-						'<p class="ce-sub">Clique em "Ativar" em cada uma das três (com o projeto certo selecionado no topo):</p>' +
+						'<p class="ce-sub">Clique em "Ativar" em cada uma (com o projeto certo selecionado no topo). A Indexing API é opcional — só é usada pelo botão "Solicitar indexação" na página Desempenho:</p>' +
 						'<p>' +
 							'<a class="ce-btn ce-btn-sm" href="https://console.cloud.google.com/apis/library/searchconsole.googleapis.com" target="_blank" rel="noopener">↗ Search Console API</a> ' +
 							'<a class="ce-btn ce-btn-sm" href="https://console.cloud.google.com/apis/library/analyticsdata.googleapis.com" target="_blank" rel="noopener">↗ Google Analytics Data API</a> ' +
-							'<a class="ce-btn ce-btn-sm" href="https://console.cloud.google.com/apis/library/analyticsadmin.googleapis.com" target="_blank" rel="noopener">↗ Google Analytics Admin API</a>' +
+							'<a class="ce-btn ce-btn-sm" href="https://console.cloud.google.com/apis/library/analyticsadmin.googleapis.com" target="_blank" rel="noopener">↗ Google Analytics Admin API</a> ' +
+							'<a class="ce-btn ce-btn-sm" href="https://console.cloud.google.com/apis/library/indexing.googleapis.com" target="_blank" rel="noopener">↗ Indexing API (opcional)</a>' +
 						'</p>' +
 					'</div>' +
 
 					'<div class="ce-option" style="cursor:default;display:block">' +
 						'<p><b>3. Configure a tela de consentimento OAuth</b></p>' +
-						'<p class="ce-sub">Tipo de usuário "Externo", preencha nome do app e e-mail de suporte. Em "Escopos", adicione <code>.../auth/webmasters.readonly</code> e <code>.../auth/analytics.readonly</code>. Enquanto o app estiver em modo "Teste", adicione sua própria conta Google em "Usuários de teste" — sem isso o Google bloqueia o login.</p>' +
+						'<p class="ce-sub">Tipo de usuário "Externo", preencha nome do app e e-mail de suporte. Em "Escopos", adicione <code>.../auth/webmasters.readonly</code>, <code>.../auth/analytics.readonly</code> e, para o botão "Solicitar indexação", <code>.../auth/indexing</code>. Enquanto o app estiver em modo "Teste", adicione sua própria conta Google em "Usuários de teste" — sem isso o Google bloqueia o login. Se você já conectou antes, reconecte para conceder o novo escopo de indexação.</p>' +
 						'<p><a class="ce-btn ce-btn-sm" href="https://console.cloud.google.com/apis/credentials/consent" target="_blank" rel="noopener">↗ Tela de consentimento</a></p>' +
 					'</div>' +
 
@@ -2758,17 +2759,31 @@
 
 	var perfData = null; // dataset cru desta carga, para ordenar/filtrar no cliente sem nova chamada.
 
+	function indexChip(idx) {
+		if (!idx || !idx.state) { return '<span class="ce-sub">não checado</span>'; }
+		var map = {
+			indexed:     ['Indexado', 'ce-chip ce-chip-green'],
+			not_indexed: ['Não indexado', 'ce-chip ce-chip-red'],
+			unknown:     ['Desconhecido', 'ce-chip ce-chip-amber']
+		};
+		var m = map[idx.state] || map.unknown;
+		return '<span class="' + m[1] + '" title="' + esc(idx.coverage || '') + '">' + m[0] + '</span>';
+	}
+
 	function perfRowsHtml(list, hasSerp) {
-		if (!list.length) { return '<tr><td colspan="9" class="ce-sub">Nenhum resultado para esta busca.</td></tr>'; }
+		if (!list.length) { return '<tr><td colspan="10" class="ce-sub">Nenhum resultado para esta busca.</td></tr>'; }
 		return list.map(function (p) {
 			var serp = p.serp
 				? trendArrow(p.serp.position) + ' <small class="ce-sub">' + esc(p.serp.checked_at || '') + '</small>'
 				: (hasSerp ? '<span class="ce-sub">não checado</span>' : '<span class="ce-sub">sem API</span>');
 			var gsc = p.gsc || {};
 			var slugHtml = p.slug ? '<a class="ce-url-slug" href="' + esc(p.view) + '" target="_blank" rel="noopener">/' + esc(p.slug) + '</a>' : '';
+			var selCell = (perfData && perfData.google_connected) ? '<input type="checkbox" class="ce-perf-sel" value="' + p.post_id + '">' : '';
 			return '<tr>' +
+				'<td style="width:32px;text-align:center">' + selCell + '</td>' +
 				'<td><a href="' + esc(p.edit) + '" target="_blank" rel="noopener">' + esc(p.title) + '</a>' + slugHtml + '<div style="margin-top:5px"><span class="ce-chip ce-chip-kw">' + esc(p.keyword || '—') + '</span></div></td>' +
 				'<td>' + serp + ' <button class="ce-btn ce-btn-sm ce-btn-ghost" data-serpcheck="' + p.post_id + '" data-kw="' + esc(p.keyword || '') + '" title="Reconsultar posição">↻</button></td>' +
+				'<td>' + indexChip(p.index) + '</td>' +
 				'<td>' + (p.gsc ? gsc.clicks : '<span class="ce-sub">—</span>') + '</td>' +
 				'<td>' + (p.gsc ? gsc.impressions : '<span class="ce-sub">—</span>') + '</td>' +
 				'<td>' + (p.gsc ? gsc.ctr + '%' : '<span class="ce-sub">—</span>') + '</td>' +
@@ -2805,7 +2820,14 @@
 		sessions_desc: function (a, b) { return (b.ga4_sessions || -1) - (a.ga4_sessions || -1); },
 		sessions_asc:  function (a, b) { return (a.ga4_sessions === null ? 1e9 : a.ga4_sessions) - (b.ga4_sessions === null ? 1e9 : b.ga4_sessions); },
 		serp_asc:     function (a, b) { return (a.serp && a.serp.position ? a.serp.position : 999) - (b.serp && b.serp.position ? b.serp.position : 999); },
-		serp_desc:    function (a, b) { return (b.serp && b.serp.position ? b.serp.position : 0) - (a.serp && a.serp.position ? a.serp.position : 0); }
+		serp_desc:    function (a, b) { return (b.serp && b.serp.position ? b.serp.position : 0) - (a.serp && a.serp.position ? a.serp.position : 0); },
+		index_notidx: function (a, b) {
+			var rank = { not_indexed: 0, unknown: 1, indexed: 2 };
+			var ra = a.index && rank[a.index.state] !== undefined ? rank[a.index.state] : 3;
+			var rb = b.index && rank[b.index.state] !== undefined ? rank[b.index.state] : 3;
+			if (ra !== rb) { return ra - rb; }
+			return a.title.localeCompare(b.title, 'pt-BR');
+		}
 	};
 
 	function applyPerfView() {
@@ -2841,6 +2863,84 @@
 		$$('[data-perfinsight]', el).forEach(function (b) {
 			b.addEventListener('click', function () { openPerfInsight(b.dataset.perfinsight, b.dataset.title); });
 		});
+		// Seleção: recontar ao marcar/desmarcar (checkboxes são recriados a cada re-render).
+		$$('.ce-perf-sel', el).forEach(function (c) { c.addEventListener('change', refreshPerfSelCount); });
+		var selall = $('#ce-perf-selall');
+		if (selall) { selall.checked = false; }
+		refreshPerfSelCount();
+	}
+
+	function perfSelected() {
+		var el = $('#ce-panel-performance');
+		return $$('.ce-perf-sel', el).filter(function (c) { return c.checked; });
+	}
+
+	function refreshPerfSelCount() {
+		var span = $('#ce-perf-selcount');
+		if (span) { span.textContent = perfSelected().length; }
+	}
+
+	/* Ações de indexação em lote (URL Inspection + Indexing API). */
+	function bindPerfIndexActions() {
+		var selall = $('#ce-perf-selall');
+		if (selall) {
+			selall.addEventListener('change', function () {
+				var on = this.checked;
+				$$('.ce-perf-sel', $('#ce-panel-performance')).forEach(function (c) { c.checked = on; });
+				refreshPerfSelCount();
+			});
+		}
+
+		var checkBtn = $('#ce-perf-index-check');
+		if (checkBtn) {
+			checkBtn.addEventListener('click', function () {
+				var bar = $('#ce-perf-idxbar'), fill = $('#ce-perf-idxfill'), msg = $('#ce-perf-idxmsg');
+				checkBtn.disabled = true; bar.hidden = false;
+				(function step(offset) {
+					api('index_status_batch', { offset: offset }).then(function (r) {
+						var pct = r.total ? (r.done / r.total) * 100 : 100;
+						fill.style.width = pct + '%';
+						msg.textContent = 'Checando indexação ' + r.done + '/' + r.total + ' (URL Inspection)';
+						if (r.done < r.total) { step(r.done); } else {
+							msg.textContent = 'Checagem concluída.';
+							checkBtn.disabled = false;
+							if (r.notes && r.notes.length) { toast(r.notes[0], true); }
+							setTimeout(function () { bar.hidden = true; }, 800);
+							loadPanel('performance', true);
+						}
+					}).catch(function (e) {
+						checkBtn.disabled = false; bar.hidden = true;
+						toast(e.message, true);
+					});
+				})(0);
+			});
+		}
+
+		var reqBtn = $('#ce-perf-index-req');
+		if (reqBtn) {
+			reqBtn.addEventListener('click', function () {
+				var ids = perfSelected().map(function (c) { return c.value; });
+				if (!ids.length) { toast('Selecione ao menos uma página', true); return; }
+				modal('<h3 class="ce-h2">Solicitar indexação ao Google</h3>' +
+					'<p class="ce-sub">Vai enviar ' + ids.length + ' URL(s) para a Indexing API do Google (tipo URL_UPDATED). O Google só garante suporte oficial a páginas com schema JobPosting/BroadcastEvent; para páginas comuns o envio pode ser ignorado. Deseja continuar?</p>' +
+					'<p style="margin-top:12px"><button class="ce-btn ce-btn-primary" id="ce-idxreq-go">Enviar ' + ids.length + ' agora</button> ' +
+					'<button class="ce-btn ce-btn-ghost" data-dismiss="1">Cancelar</button></p><div id="ce-idxreq-out"></div>');
+				$('#ce-idxreq-go').addEventListener('click', function () {
+					var out = $('#ce-idxreq-out');
+					$('#ce-idxreq-go').disabled = true;
+					out.innerHTML = '<div class="ce-loading">Enviando à Indexing API</div>';
+					api('index_request_batch', { post_ids: JSON.stringify(ids) }).then(function (r) {
+						out.innerHTML = '<p><span class="ce-chip ce-chip-green">' + r.sent + ' enviada(s)</span> ' +
+							(r.fail ? '<span class="ce-chip ce-chip-red">' + r.fail + ' falha(s)</span>' : '') + '</p>' +
+							(r.notes && r.notes.length ? '<p class="ce-sub">' + esc(r.notes[0]) + '</p>' : '');
+						toast(r.sent + ' URL(s) enviada(s) para indexação');
+					}).catch(function (e) {
+						$('#ce-idxreq-go').disabled = false;
+						out.innerHTML = '<p class="ce-sub">' + esc(e.message) + '</p>';
+					});
+				});
+			});
+		}
 	}
 
 	/* Gráfico SVG simples (sem libs externas) com marcadores de atualização de conteúdo. */
@@ -3056,15 +3156,27 @@
 						'<option value="sessions_asc">Sessões GA4 — menor para maior</option>' +
 						'<option value="serp_asc">Posição no Google — melhor primeiro</option>' +
 						'<option value="serp_desc">Posição no Google — pior primeiro</option>' +
+						'<option value="index_notidx">Índice — não indexados primeiro</option>' +
 					'</select>' +
 				'</div>' +
+				(hasGoogle
+					? '<div class="ce-net-toolbar" style="margin-bottom:10px">' +
+						'<label class="ce-check"><input type="checkbox" id="ce-perf-selall"> Selecionar tudo</label>' +
+						'<button class="ce-btn ce-btn-sm" id="ce-perf-index-check">🔎 Checar indexação (lote)</button>' +
+						'<button class="ce-btn ce-btn-sm ce-btn-primary" id="ce-perf-index-req">⬆ Solicitar indexação (<span id="ce-perf-selcount">0</span>)</button>' +
+						(d.indexing_scope ? '' : '<span class="ce-sub">Para solicitar indexação, <a href="' + esc(CE61.pages.settings) + '&ce-tab=integrations">reconecte o Google</a> (novo escopo de indexação).</span>') +
+					  '</div>'
+					: '') +
+				'<div class="ce-scanbar" id="ce-perf-idxbar" hidden><div class="ce-scanbar-track"><div class="ce-scanbar-fill" id="ce-perf-idxfill"></div></div><p id="ce-perf-idxmsg"></p></div>' +
 				'<div class="ce-card ce-table-wrap"><table class="ce-table"><thead><tr>' +
-					'<th>Página</th><th>Posição Google</th><th>Cliques</th><th>Impressões</th><th>CTR</th><th>Posição média</th><th>Sessões (GA4)</th><th></th>' +
+					'<th style="width:32px"></th><th>Página</th><th>Posição Google</th><th>Status índice</th><th>Cliques</th><th>Impressões</th><th>CTR</th><th>Posição média</th><th>Sessões (GA4)</th><th></th>' +
 				'</tr></thead><tbody id="ce-perf-tbody">' + perfRowsHtml(d.posts, hasSerp) + '</tbody></table></div>';
 
 			$('#ce-perf-search').addEventListener('input', applyPerfView);
 			$('#ce-perf-sort').addEventListener('change', applyPerfView);
 			applyPerfView(); // aplica a ordenação padrão (Relevância) já na carga inicial.
+
+			if (hasGoogle) { bindPerfIndexActions(); }
 
 			$('#ce-perf-refresh').addEventListener('click', function () {
 				var btn = $('#ce-perf-refresh'), bar = $('#ce-perf-bar'), fill = $('#ce-perf-fill'), msg = $('#ce-perf-msg');
