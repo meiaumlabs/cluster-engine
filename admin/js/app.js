@@ -2841,6 +2841,12 @@
 		title_desc:   function (a, b) { return b.title.localeCompare(a.title, 'pt-BR'); },
 		clicks_desc:  function (a, b) { return (b.gsc ? b.gsc.clicks : -1) - (a.gsc ? a.gsc.clicks : -1); },
 		clicks_asc:   function (a, b) { return (a.gsc ? a.gsc.clicks : 1e9) - (b.gsc ? b.gsc.clicks : 1e9); },
+		impr_desc:    function (a, b) { return (b.gsc ? b.gsc.impressions : -1) - (a.gsc ? a.gsc.impressions : -1); },
+		impr_asc:     function (a, b) { return (a.gsc ? a.gsc.impressions : 1e9) - (b.gsc ? b.gsc.impressions : 1e9); },
+		ctr_desc:     function (a, b) { return (b.gsc ? b.gsc.ctr : -1) - (a.gsc ? a.gsc.ctr : -1); },
+		ctr_asc:      function (a, b) { return (a.gsc ? a.gsc.ctr : 1e9) - (b.gsc ? b.gsc.ctr : 1e9); },
+		pos_asc:      function (a, b) { return (a.gsc && a.gsc.position ? a.gsc.position : 999) - (b.gsc && b.gsc.position ? b.gsc.position : 999); },
+		pos_desc:     function (a, b) { return (b.gsc && b.gsc.position ? b.gsc.position : 0) - (a.gsc && a.gsc.position ? a.gsc.position : 0); },
 		sessions_desc: function (a, b) { return (b.ga4_sessions || -1) - (a.ga4_sessions || -1); },
 		sessions_asc:  function (a, b) { return (a.ga4_sessions === null ? 1e9 : a.ga4_sessions) - (b.ga4_sessions === null ? 1e9 : b.ga4_sessions); },
 		serp_asc:     function (a, b) { return (a.serp && a.serp.position ? a.serp.position : 999) - (b.serp && b.serp.position ? b.serp.position : 999); },
@@ -2865,6 +2871,63 @@
 		list = list.slice().sort(perfSorters[sortKey] || perfSorters.smart);
 		var tbody = $('#ce-perf-tbody');
 		if (tbody) { tbody.innerHTML = perfRowsHtml(list, perfData.has_serp); bindPerfRowActions(); }
+		updatePerfHeadSort();
+	}
+
+	/* Colunas ordenáveis do cabeçalho da tabela de desempenho.
+	   asc/desc = chaves em perfSorters; def = direção do primeiro clique. */
+	var perfHeadCols = [
+		{ label: 'Página',          asc: 'title_asc',  desc: 'title_desc',  def: 'asc' },
+		{ label: 'Posição Google',  asc: 'serp_asc',   desc: 'serp_desc',   def: 'asc' },
+		{ label: 'Status índice',   asc: 'index_notidx', desc: 'index_notidx', def: 'asc' },
+		{ label: 'Cliques',         asc: 'clicks_asc', desc: 'clicks_desc', def: 'desc' },
+		{ label: 'Impressões',      asc: 'impr_asc',   desc: 'impr_desc',   def: 'desc' },
+		{ label: 'CTR',             asc: 'ctr_asc',    desc: 'ctr_desc',    def: 'desc' },
+		{ label: 'Posição média',   asc: 'pos_asc',    desc: 'pos_desc',    def: 'asc' },
+		{ label: 'Sessões (GA4)',   asc: 'sessions_asc', desc: 'sessions_desc', def: 'desc' }
+	];
+
+	function perfHeadHtml() {
+		var cells = '<th style="width:32px"></th>';
+		perfHeadCols.forEach(function (c, i) {
+			cells += '<th class="ce-th-sort" data-perfcol="' + i + '" tabindex="0" role="button" title="Ordenar por ' + esc(c.label) + '">' +
+				'<span class="ce-th-label">' + esc(c.label) + '</span>' +
+				'<span class="ce-th-arrow" aria-hidden="true"></span>' +
+			'</th>';
+		});
+		cells += '<th></th>';
+		return cells;
+	}
+
+	/* Reflete no cabeçalho a ordenação ativa (lida do #ce-perf-sort). */
+	function updatePerfHeadSort() {
+		var sortKey = $('#ce-perf-sort') ? $('#ce-perf-sort').value : 'smart';
+		$$('#ce-panel-performance .ce-th-sort').forEach(function (th) {
+			var c = perfHeadCols[+th.dataset.perfcol];
+			th.classList.remove('is-asc', 'is-desc');
+			if (c.asc === sortKey) { th.classList.add('is-asc'); }
+			else if (c.desc === sortKey) { th.classList.add('is-desc'); }
+		});
+	}
+
+	function bindPerfHeadSort() {
+		$$('#ce-panel-performance .ce-th-sort').forEach(function (th) {
+			var handler = function () {
+				var c = perfHeadCols[+th.dataset.perfcol];
+				var sel = $('#ce-perf-sort');
+				if (!sel) { return; }
+				var cur = sel.value, next;
+				if (cur === c.asc && c.asc !== c.desc) { next = c.desc; }
+				else if (cur === c.desc && c.asc !== c.desc) { next = c.asc; }
+				else { next = (c.def === 'asc') ? c.asc : c.desc; }
+				sel.value = next;
+				applyPerfView();
+			};
+			th.addEventListener('click', handler);
+			th.addEventListener('keydown', function (e) {
+				if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); }
+			});
+		});
 	}
 
 	function bindPerfRowActions() {
@@ -3193,11 +3256,12 @@
 					: '') +
 				'<div class="ce-scanbar" id="ce-perf-idxbar" hidden><div class="ce-scanbar-track"><div class="ce-scanbar-fill" id="ce-perf-idxfill"></div></div><p id="ce-perf-idxmsg"></p></div>' +
 				'<div class="ce-card ce-table-wrap"><table class="ce-table"><thead><tr>' +
-					'<th style="width:32px"></th><th>Página</th><th>Posição Google</th><th>Status índice</th><th>Cliques</th><th>Impressões</th><th>CTR</th><th>Posição média</th><th>Sessões (GA4)</th><th></th>' +
+					perfHeadHtml() +
 				'</tr></thead><tbody id="ce-perf-tbody">' + perfRowsHtml(d.posts, hasSerp) + '</tbody></table></div>';
 
 			$('#ce-perf-search').addEventListener('input', applyPerfView);
 			$('#ce-perf-sort').addEventListener('change', applyPerfView);
+			bindPerfHeadSort();
 			applyPerfView(); // aplica a ordenação padrão (Relevância) já na carga inicial.
 
 			if (hasGoogle) { bindPerfIndexActions(); }

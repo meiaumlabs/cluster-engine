@@ -255,6 +255,22 @@ a.ce-url-slug:hover { color: var(--ce-cobalt); text-decoration: underline; }
 	text-transform: uppercase; color: var(--ce-ink-3);
 	padding: 12px 14px; border-bottom: 1px solid var(--ce-line);
 }
+.ce-table th.ce-th-sort {
+	cursor: pointer; user-select: none; white-space: nowrap;
+}
+.ce-table th.ce-th-sort:hover { color: var(--ce-ink-1); }
+.ce-table th.ce-th-sort:focus-visible { outline: 2px solid var(--ce-cobalt); outline-offset: -2px; }
+.ce-th-arrow {
+	display: inline-block; width: 10px; margin-left: 4px;
+	font-size: 9px; line-height: 1; vertical-align: middle;
+	color: var(--ce-ink-3); opacity: .4;
+}
+.ce-th-arrow::before { content: "\2195"; } /* ↕ neutro */
+.ce-th-sort:hover .ce-th-arrow { opacity: .7; }
+.ce-th-sort.is-asc .ce-th-arrow,
+.ce-th-sort.is-desc .ce-th-arrow { opacity: 1; color: var(--ce-cobalt); }
+.ce-th-sort.is-asc .ce-th-arrow::before { content: "\25B2"; }  /* ▲ */
+.ce-th-sort.is-desc .ce-th-arrow::before { content: "\25BC"; } /* ▼ */
 .ce-table td { padding: 13px 14px; border-bottom: 1px solid var(--ce-line); vertical-align: middle; }
 .ce-table tr:last-child td { border-bottom: none; }
 .ce-table tbody tr { transition: background .15s; }

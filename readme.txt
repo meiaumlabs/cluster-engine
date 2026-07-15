@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.18.0
+Stable tag: 2.19.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,10 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.19.0 =
+* Novo: ícones de ordenação clicáveis no cabeçalho da tabela de desempenho (?page=cluster-engine-performance). Clique em qualquer coluna — Página, Posição Google, Status índice, Cliques, Impressões, CTR, Posição média, Sessões (GA4) — para ordenar; um novo clique inverte a direção. A seta ▲/▼ indica a coluna e o sentido ativos, sincronizados com o seletor de ordenação existente.
+* Novo: colunas Impressões, CTR e Posição média agora também são ordenáveis.
 
 = 2.18.0 =
 * Novo: botão "Ajustar melhoria" na tela de aprovação do rascunho. Em vez de recomeçar do conteúdo original, a IA refina o próprio rascunho já gerado a partir de um novo pedido (ex.: "encurte a conclusão", "transforme o 3º parágrafo em lista"). Dá para ajustar quantas vezes quiser antes de aprovar.
