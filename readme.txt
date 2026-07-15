@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.16.0
+Stable tag: 2.17.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,12 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.17.0 =
+* Novo: a modal "Melhorar com IA" do editor agora tem 2 colunas. À esquerda, o diagnóstico do próprio Cluster Engine — notas E-E-A-T/AEO/GEO, o scan SEO/AEO do Painel, o desempenho dos últimos 90 dias (cliques, impressões, posição GSC/Google, sessões GA4, CTR, com variação) e a lista de melhorias sugeridas. À direita, o campo de prompt.
+* Novo: dois botões de geração — "Gerar melhorias com base no diagnóstico" (a IA corrige as pendências detectadas) e "Gerar com diagnóstico + prompt" (a IA cruza o diagnóstico com o seu pedido).
+* Novo: fluxo de aprovação. A IA gera um rascunho mostrando a nota atual; você revisa e só então aprova. Ao aprovar, dá para atualizar salvando ou "Aprovar e publicar" (atualiza + publica).
+* Novo: histórico de alterações por URL (changelog). Cada atualização feita pela IA guarda a versão anterior; a modal lista o histórico da URL e um botão "Reverter" para voltar o conteúdo a qualquer versão registrada (o estado atual fica salvo antes de reverter).
 
 = 2.16.0 =
 * Novo: com o Rank Math ativo, o schema (Article/BlogPosting e FAQ) passa a ser gravado no campo de schema do Rank Math (postmeta rank_math_schema_*) em vez de ser injetado como <script> JSON-LD no conteúdo. Vale ao inserir Article, gerar FAQ, na correção "Ver ajustes" e na fila em massa. Reexecutar atualiza o mesmo schema em vez de duplicar.

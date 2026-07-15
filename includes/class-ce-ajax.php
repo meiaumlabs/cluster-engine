@@ -23,7 +23,7 @@ class CE61_Ajax {
 			'save_settings', 'save_prompts', 'reset_prompt', 'rename_cluster', 'set_pillar',
 			'creator_data', 'suggest_clusters', 'create_cluster', 'delete_cluster',
 			'cluster_plan', 'remove_topic', 'generate_now', 'improve_prompt', 'ai_posts_list', 'post_eeat', 'set_publish', 'creator_fix_issue',
-			'editor_improve',
+			'editor_improve', 'editor_diagnostics', 'editor_apply', 'editor_log', 'editor_revert',
 			'queue_add', 'queue_list', 'queue_cancel', 'queue_retry', 'queue_clear', 'queue_run_now',
 			'performance_data', 'performance_refresh_batch', 'performance_serp_one', 'index_status_batch', 'index_request_batch',
 			'performance_history', 'performance_insight', 'performance_insight_save', 'performance_insight_list', 'performance_insight_delete',
@@ -1896,15 +1896,173 @@ class CE61_Ajax {
 	}
 
 	/**
-	 * Melhora com IA o conteúdo de UM post/página existente a partir das
-	 * instruções do usuário (o que precisa ser atualizado), mantendo a base
-	 * de configuração do site (global prompt aplicado como system) e o assunto.
-	 * Sobrescreve o post_content com o HTML retornado e recalcula as notas.
+	 * Coleta o diagnóstico completo de um post para a modal do editor:
+	 * notas E-E-A-T/AEO/GEO (recalculadas na hora), o scan SEO/AEO da tabela
+	 * ce_index, a keyword foco e um resumo de desempenho (GSC/GA4/SERP) na
+	 * janela de 90 dias (último ponto com dados + variação vs. o primeiro).
+	 */
+	private static function collect_diagnostics( $pid ) {
+		global $wpdb;
+		$post = get_post( $pid );
+
+		$scores = CE61_Creator::analyze_scores( $pid );
+		update_post_meta( $pid, '_ce61_scores', wp_json_encode( $scores, JSON_UNESCAPED_UNICODE ) );
+
+		$idx = $wpdb->get_row( $wpdb->prepare(
+			"SELECT seo_score, aeo_score, issues, main_keyword FROM {$wpdb->prefix}ce_index WHERE post_id = %d", $pid
+		), ARRAY_A );
+		$index = null;
+		if ( $idx ) {
+			$issues = json_decode( (string) $idx['issues'], true );
+			$index  = array(
+				'seo'    => (int) $idx['seo_score'],
+				'aeo'    => (int) $idx['aeo_score'],
+				'issues' => is_array( $issues ) ? array_values( array_filter( array_map( 'strval', $issues ) ) ) : array(),
+			);
+		}
+
+		$keyword = CE61_SEO::get_focus_keyword( $pid );
+		if ( ! $keyword && $idx ) {
+			$keyword = (string) $idx['main_keyword'];
+		}
+
+		$perf = array( 'latest' => null, 'delta' => null, 'has_data' => false );
+		if ( class_exists( 'CE61_History' ) ) {
+			$h    = CE61_History::get_history( $pid, 90 );
+			$pts  = isset( $h['points'] ) && is_array( $h['points'] ) ? $h['points'] : array();
+			$keys = array( 'clicks', 'impressions', 'ctr', 'gsc_position', 'serp_position', 'ga4_sessions' );
+			$has  = function ( $p, $k ) {
+				return isset( $p[ $k ] ) && null !== $p[ $k ] && '' !== $p[ $k ];
+			};
+			$latest = null;
+			for ( $i = count( $pts ) - 1; $i >= 0; $i-- ) {
+				foreach ( $keys as $k ) {
+					if ( $has( $pts[ $i ], $k ) ) { $latest = $pts[ $i ]; break 2; }
+				}
+			}
+			$first = null;
+			foreach ( $pts as $p ) {
+				foreach ( $keys as $k ) {
+					if ( $has( $p, $k ) ) { $first = $p; break 2; }
+				}
+			}
+			if ( $latest ) {
+				$perf['has_data'] = true;
+				$perf['latest']   = array( 'date' => $latest['snap_date'] );
+				foreach ( $keys as $k ) {
+					$perf['latest'][ $k ] = $has( $latest, $k ) ? round( (float) $latest[ $k ], 2 ) : null;
+				}
+				if ( $first && $first !== $latest ) {
+					$perf['delta'] = array();
+					foreach ( array( 'clicks', 'impressions', 'gsc_position', 'serp_position', 'ga4_sessions' ) as $k ) {
+						$perf['delta'][ $k ] = ( $has( $latest, $k ) && $has( $first, $k ) )
+							? round( (float) $latest[ $k ] - (float) $first[ $k ], 2 )
+							: null;
+					}
+				}
+			}
+		}
+
+		return array(
+			'title'       => $post ? $post->post_title : '',
+			'status'      => $post ? $post->post_status : '',
+			'url'         => $post ? get_permalink( $pid ) : '',
+			'keyword'     => $keyword,
+			'scores'      => $scores,
+			'index'       => $index,
+			'performance' => $perf,
+			'changelog'   => class_exists( 'CE61_Changelog' ) ? CE61_Changelog::entries( $pid ) : array(),
+		);
+	}
+
+	/**
+	 * Lista de pendências (labels) reunidas do diagnóstico de notas + scan SEO,
+	 * já deduplicadas — é o que a IA recebe para corrigir prioritariamente.
+	 */
+	private static function diagnostics_pending( $data ) {
+		$pend = array();
+		if ( ! empty( $data['scores'] ) && is_array( $data['scores'] ) ) {
+			foreach ( array( 'eeat' => 'E-E-A-T', 'aeo' => 'AEO', 'geo' => 'GEO' ) as $k => $lab ) {
+				if ( ! empty( $data['scores'][ $k ]['issues'] ) ) {
+					foreach ( $data['scores'][ $k ]['issues'] as $iss ) {
+						if ( ! empty( $iss['label'] ) ) {
+							$pend[] = '[' . $lab . '] ' . $iss['label'];
+						}
+					}
+				}
+			}
+		}
+		if ( ! empty( $data['index']['issues'] ) ) {
+			foreach ( $data['index']['issues'] as $iss ) {
+				$pend[] = '[SEO] ' . $iss;
+			}
+		}
+		return array_values( array_unique( $pend ) );
+	}
+
+	/**
+	 * Resumo textual do diagnóstico injetado no prompt da IA.
+	 */
+	private static function diagnostics_text( $data ) {
+		$s     = $data['scores'];
+		$lines = array( sprintf(
+			'Notas atuais — E-E-A-T: %d/100, AEO: %d/100, GEO: %d/100.',
+			isset( $s['eeat']['score'] ) ? (int) $s['eeat']['score'] : 0,
+			isset( $s['aeo']['score'] ) ? (int) $s['aeo']['score'] : 0,
+			isset( $s['geo']['score'] ) ? (int) $s['geo']['score'] : 0
+		) );
+		if ( ! empty( $data['index'] ) ) {
+			$lines[] = sprintf( 'Scan do Painel — Score SEO: %d/100, Score AEO/GEO: %d/100.', (int) $data['index']['seo'], (int) $data['index']['aeo'] );
+		}
+		if ( ! empty( $data['performance']['has_data'] ) && ! empty( $data['performance']['latest'] ) ) {
+			$l   = $data['performance']['latest'];
+			$fmt = function ( $v ) { return ( null === $v ) ? '—' : $v; };
+			$lines[] = sprintf(
+				'Desempenho recente (%s) — cliques: %s, impressões: %s, posição GSC: %s, posição Google: %s, sessões GA4: %s.',
+				$l['date'], $fmt( $l['clicks'] ), $fmt( $l['impressions'] ), $fmt( $l['gsc_position'] ), $fmt( $l['serp_position'] ), $fmt( $l['ga4_sessions'] )
+			);
+		}
+		$pend = self::diagnostics_pending( $data );
+		if ( $pend ) {
+			$lines[] = 'Pendências a corrigir prioritariamente:';
+			foreach ( $pend as $p ) {
+				$lines[] = '- ' . $p;
+			}
+		} else {
+			$lines[] = 'Nenhuma pendência crítica detectada — foque em aprofundar, atualizar dados e reforçar autoridade.';
+		}
+		return implode( "\n", $lines );
+	}
+
+	/**
+	 * Devolve o diagnóstico do post para a coluna esquerda da modal do editor.
+	 */
+	public static function editor_diagnostics() {
+		self::guard();
+		$pid  = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$post = $pid ? get_post( $pid ) : null;
+		if ( ! $post ) {
+			wp_send_json_error( array( 'message' => __( 'Post não encontrado.', 'cluster-engine' ) ) );
+		}
+		if ( ! current_user_can( 'edit_post', $pid ) ) {
+			wp_send_json_error( array( 'message' => __( 'Sem permissão para editar este conteúdo.', 'cluster-engine' ) ), 403 );
+		}
+		wp_send_json_success( self::collect_diagnostics( $pid ) );
+	}
+
+	/**
+	 * Gera com IA uma versão melhorada de UM post/página, cruzando o diagnóstico
+	 * do Cluster Engine (notas E-E-A-T/AEO/GEO, scan SEO e desempenho GSC/GA4)
+	 * com as instruções do usuário. NÃO salva: devolve o rascunho para aprovação
+	 * junto das notas atuais. O salvamento/publicação ocorre em editor_apply().
+	 *
+	 * mode: 'diagnostic' (só diagnóstico) ou 'combined' (diagnóstico + prompt).
 	 */
 	public static function editor_improve() {
 		self::guard();
 		@set_time_limit( 120 );
 		$pid          = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$mode         = isset( $_POST['mode'] ) ? sanitize_key( $_POST['mode'] ) : 'combined';
 		$instructions = isset( $_POST['instructions'] ) ? sanitize_textarea_field( wp_unslash( $_POST['instructions'] ) ) : '';
 		$post         = $pid ? get_post( $pid ) : null;
 		if ( ! $post ) {
@@ -1913,13 +2071,25 @@ class CE61_Ajax {
 		if ( ! current_user_can( 'edit_post', $pid ) ) {
 			wp_send_json_error( array( 'message' => __( 'Sem permissão para editar este conteúdo.', 'cluster-engine' ) ), 403 );
 		}
-		if ( '' === trim( $instructions ) ) {
-			wp_send_json_error( array( 'message' => __( 'Descreva o que precisa ser atualizado no conteúdo.', 'cluster-engine' ) ) );
+		if ( 'diagnostic' !== $mode ) {
+			$mode = 'combined';
+		}
+		if ( 'combined' === $mode && '' === trim( $instructions ) ) {
+			wp_send_json_error( array( 'message' => __( 'Escreva o que a IA deve fazer, ou use o botão de melhorar só com base no diagnóstico.', 'cluster-engine' ) ) );
+		}
+
+		$diag      = self::collect_diagnostics( $pid );
+		$diag_text = self::diagnostics_text( $diag );
+
+		if ( 'diagnostic' === $mode ) {
+			$final = "Melhore o conteúdo corrigindo prioritariamente as pendências do diagnóstico abaixo e elevando as notas E-E-A-T, AEO e GEO.\n\nDIAGNÓSTICO DO CLUSTER ENGINE:\n" . $diag_text;
+		} else {
+			$final = "PEDIDO DO USUÁRIO:\n" . $instructions . "\n\nAlém do pedido acima, cruze com o diagnóstico do Cluster Engine e corrija as pendências relevantes, elevando as notas E-E-A-T, AEO e GEO.\n\nDIAGNÓSTICO DO CLUSTER ENGINE:\n" . $diag_text;
 		}
 
 		$content_html = mb_substr( (string) $post->post_content, 0, 12000 );
 		$ai = CE61_AI::run( 'improve_post', $pid, array(
-			'instructions' => $instructions,
+			'instructions' => $final,
 			'content_html' => $content_html,
 		) );
 		if ( is_wp_error( $ai ) ) {
@@ -1933,21 +2103,132 @@ class CE61_Ajax {
 			wp_send_json_error( array( 'message' => __( 'A IA não retornou conteúdo utilizável.', 'cluster-engine' ) ) );
 		}
 
-		$upd = wp_update_post( array( 'ID' => $pid, 'post_content' => wp_slash( $html ) ), true );
+		$pt_obj      = get_post_type_object( $post->post_type );
+		$can_publish = $pt_obj && current_user_can( $pt_obj->cap->publish_posts );
+
+		// Preview para aprovação: NÃO salva ainda.
+		wp_send_json_success( array(
+			'message'      => __( 'Rascunho gerado. Revise e aprove para atualizar o conteúdo.', 'cluster-engine' ),
+			'draft'        => $html,
+			'preview'      => wp_kses_post( $html ),
+			'scores'       => $diag['scores'],
+			'status'       => $diag['status'],
+			'can_publish'  => $can_publish ? 1 : 0,
+			'is_published' => ( 'publish' === $diag['status'] ) ? 1 : 0,
+		) );
+	}
+
+	/**
+	 * Aplica o rascunho aprovado: sobrescreve o conteúdo, opcionalmente publica
+	 * (se o usuário tiver permissão e o post ainda não estiver publicado),
+	 * recalcula as notas e devolve as notas novas para a modal comparar.
+	 */
+	public static function editor_apply() {
+		self::guard();
+		@set_time_limit( 120 );
+		$pid     = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$content = isset( $_POST['content'] ) ? (string) wp_unslash( $_POST['content'] ) : '';
+		$publish = ! empty( $_POST['publish'] );
+		$post    = $pid ? get_post( $pid ) : null;
+		if ( ! $post ) {
+			wp_send_json_error( array( 'message' => __( 'Post não encontrado.', 'cluster-engine' ) ) );
+		}
+		if ( ! current_user_can( 'edit_post', $pid ) ) {
+			wp_send_json_error( array( 'message' => __( 'Sem permissão para editar este conteúdo.', 'cluster-engine' ) ), 403 );
+		}
+		$html = trim( $content );
+		$html = preg_replace( '/^```(?:html)?\s*/i', '', $html );
+		$html = preg_replace( '/\s*```$/', '', $html );
+		$html = wp_kses_post( trim( $html ) );
+		if ( '' === $html ) {
+			wp_send_json_error( array( 'message' => __( 'Rascunho vazio — gere o conteúdo novamente.', 'cluster-engine' ) ) );
+		}
+
+		$mode         = isset( $_POST['mode'] ) ? sanitize_key( $_POST['mode'] ) : '';
+		$prev_content = (string) $post->post_content;
+
+		$args        = array( 'ID' => $pid, 'post_content' => wp_slash( $html ) );
+		$pt_obj      = get_post_type_object( $post->post_type );
+		$can_publish = $pt_obj && current_user_can( $pt_obj->cap->publish_posts );
+		$published   = false;
+		if ( $publish && $can_publish && 'publish' !== $post->post_status ) {
+			$args['post_status'] = 'publish';
+			$published           = true;
+		}
+		$upd = wp_update_post( $args, true );
 		if ( is_wp_error( $upd ) ) {
 			wp_send_json_error( array( 'message' => $upd->get_error_message() ) );
 		}
 
-		// Recalcula notas E-E-A-T/AEO/GEO (a classe existe no plugin).
-		if ( class_exists( 'CE61_Creator' ) && method_exists( 'CE61_Creator', 'analyze_scores' ) ) {
-			$scores = CE61_Creator::analyze_scores( $pid );
-			update_post_meta( $pid, '_ce61_scores', wp_json_encode( $scores, JSON_UNESCAPED_UNICODE ) );
+		// Registra a alteração no changelog (guarda o conteúdo anterior p/ reverter).
+		if ( class_exists( 'CE61_Changelog' ) ) {
+			$summary = ( 'diagnostic' === $mode )
+				? __( 'Melhoria com base no diagnóstico', 'cluster-engine' )
+				: ( 'combined' === $mode ? __( 'Melhoria com diagnóstico + prompt', 'cluster-engine' ) : __( 'Conteúdo atualizado com IA', 'cluster-engine' ) );
+			CE61_Changelog::add( $pid, $prev_content, array(
+				'summary'   => $summary,
+				'mode'      => $mode,
+				'published' => $published,
+			) );
 		}
 
+		$scores = CE61_Creator::analyze_scores( $pid );
+		update_post_meta( $pid, '_ce61_scores', wp_json_encode( $scores, JSON_UNESCAPED_UNICODE ) );
+
 		wp_send_json_success( array(
-			'message'  => __( 'Conteúdo atualizado com IA.', 'cluster-engine' ),
-			'content'  => $html,
-			'edit_url' => get_edit_post_link( $pid, 'raw' ),
+			'message'   => $published ? __( 'Conteúdo atualizado e publicado.', 'cluster-engine' ) : __( 'Conteúdo atualizado.', 'cluster-engine' ),
+			'scores'    => $scores,
+			'status'    => get_post_status( $pid ),
+			'published' => $published ? 1 : 0,
+			'changelog' => class_exists( 'CE61_Changelog' ) ? CE61_Changelog::entries( $pid ) : array(),
+			'edit_url'  => get_edit_post_link( $pid, 'raw' ),
+			'view_url'  => get_permalink( $pid ),
+		) );
+	}
+
+	/**
+	 * Registro global de logs: URLs atualizadas pela IA + histórico de cada uma.
+	 * Se post_id for informado, devolve só o histórico daquela URL.
+	 */
+	public static function editor_log() {
+		self::guard();
+		$pid = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		if ( $pid ) {
+			if ( ! current_user_can( 'edit_post', $pid ) ) {
+				wp_send_json_error( array( 'message' => __( 'Sem permissão.', 'cluster-engine' ) ), 403 );
+			}
+			wp_send_json_success( array( 'entries' => CE61_Changelog::entries( $pid ) ) );
+		}
+		wp_send_json_success( array( 'registry' => CE61_Changelog::registry( 50 ) ) );
+	}
+
+	/**
+	 * Reverte uma URL para a versão guardada em uma entrada do changelog.
+	 */
+	public static function editor_revert() {
+		self::guard();
+		@set_time_limit( 120 );
+		$pid = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$eid = isset( $_POST['entry_id'] ) ? sanitize_text_field( wp_unslash( $_POST['entry_id'] ) ) : '';
+		if ( ! $pid || '' === $eid ) {
+			wp_send_json_error( array( 'message' => __( 'Parâmetros inválidos.', 'cluster-engine' ) ) );
+		}
+		if ( ! current_user_can( 'edit_post', $pid ) ) {
+			wp_send_json_error( array( 'message' => __( 'Sem permissão para editar este conteúdo.', 'cluster-engine' ) ), 403 );
+		}
+		$res = CE61_Changelog::revert( $pid, $eid );
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
+		}
+
+		$scores = CE61_Creator::analyze_scores( $pid );
+		update_post_meta( $pid, '_ce61_scores', wp_json_encode( $scores, JSON_UNESCAPED_UNICODE ) );
+
+		wp_send_json_success( array(
+			'message'   => __( 'Conteúdo revertido para a versão selecionada.', 'cluster-engine' ),
+			'scores'    => $scores,
+			'changelog' => CE61_Changelog::entries( $pid ),
+			'edit_url'  => get_edit_post_link( $pid, 'raw' ),
 		) );
 	}
 
