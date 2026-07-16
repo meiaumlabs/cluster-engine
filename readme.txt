@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.23.0
+Stable tag: 2.23.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.23.1 =
+* Melhoria: o campo de busca do painel de Desempenho agora filtra também por slug e URL (permalink), além de título e keyword.
 
 = 2.23.0 =
 * Correção: páginas excluídas (ou na lixeira) não são mais exibidas na tabela de Desempenho nem na Fila de geração — os registros antigos deixam de aparecer automaticamente.

@@ -2948,7 +2948,7 @@
 		var sortKey = $('#ce-perf-sort') ? $('#ce-perf-sort').value : 'smart';
 		var list = perfData.posts.filter(function (p) {
 			if (!term) { return true; }
-			return p.title.toLowerCase().indexOf(term) > -1 || (p.keyword && p.keyword.toLowerCase().indexOf(term) > -1) || (p.slug && p.slug.toLowerCase().indexOf(term) > -1);
+			return p.title.toLowerCase().indexOf(term) > -1 || (p.keyword && p.keyword.toLowerCase().indexOf(term) > -1) || (p.slug && p.slug.toLowerCase().indexOf(term) > -1) || (p.view && p.view.toLowerCase().indexOf(term) > -1);
 		});
 		list = list.slice().sort(perfSorters[sortKey] || perfSorters.smart);
 		var tbody = $('#ce-perf-tbody');
@@ -3315,7 +3315,7 @@
 					'<div class="ce-scanbar" id="ce-perf-bar" hidden><div class="ce-scanbar-track"><div class="ce-scanbar-fill" id="ce-perf-fill"></div></div><p id="ce-perf-msg"></p></div>' +
 				'</div>' +
 				'<div class="ce-net-toolbar" style="margin-bottom:10px">' +
-					'<input class="ce-input" id="ce-perf-search" placeholder="Buscar por título ou keyword…" style="max-width:280px">' +
+					'<input class="ce-input" id="ce-perf-search" placeholder="Buscar por título, keyword, slug ou URL…" style="max-width:280px">' +
 					'<select class="ce-select" id="ce-perf-sort" style="max-width:280px">' +
 						'<option value="smart">Relevância (posição › impressões › A-Z)</option>' +
 						'<option value="clicks_desc">Cliques — maior para menor</option>' +
