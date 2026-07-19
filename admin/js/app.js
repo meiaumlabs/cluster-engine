@@ -1037,6 +1037,9 @@
 		{ label: 'Pendências',       key: 'issues', def: 'desc' }
 	];
 	var schemaSort = { key: 'issues', dir: 'desc' };
+	/* Filtro por status: 'issues' = só com pendências, 'done' = só completas, 'all' = todas.
+	   Módulo-level p/ sobreviver ao reload de loadSchemaResults() após uma correção. */
+	var schemaFilter = 'issues';
 
 	var schemaSorters = {
 		title:  function (a, b) { return a.title.localeCompare(b.title, 'pt-BR'); },
@@ -1132,7 +1135,15 @@
 					'<button class="ce-btn ce-btn-primary ce-btn-sm" id="ce-schema-bulk-go">⧗ Adicionar à fila (<span id="ce-schema-selcount">0</span>)</button>' +
 					'<span class="ce-sub" id="ce-schema-bulk-hint">Marque as páginas e processe as correções em segundo plano pela Fila de Geração</span>' +
 				'</div>' +
-				'<div style="margin-bottom:12px"><input type="search" class="ce-input" id="ce-schema-search" placeholder="Buscar por título, slug ou URL…" style="max-width:360px"></div>' +
+				'<div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">' +
+					'<input type="search" class="ce-input" id="ce-schema-search" placeholder="Buscar por título, slug ou URL…" style="max-width:360px">' +
+					'<select class="ce-select" id="ce-schema-filter" style="max-width:220px">' +
+						'<option value="issues"' + (schemaFilter === 'issues' ? ' selected' : '') + '>⚠ Somente com pendências</option>' +
+						'<option value="all"' + (schemaFilter === 'all' ? ' selected' : '') + '>Todas as páginas</option>' +
+						'<option value="done"' + (schemaFilter === 'done' ? ' selected' : '') + '>✓ Somente completas</option>' +
+					'</select>' +
+					'<span class="ce-sub" id="ce-schema-count"></span>' +
+				'</div>' +
 				'<table class="ce-table"><thead><tr>' + schemaHeadHtml() + '</tr></thead><tbody id="ce-schema-tbody"></tbody></table></div>';
 
 			var goBtn = $('#ce-schema-bulk-go');
@@ -1148,6 +1159,8 @@
 			function applyView() {
 				var term = ($('#ce-schema-search') ? $('#ce-schema-search').value.trim().toLowerCase() : '');
 				var list = results.filter(function (r) {
+					if (schemaFilter === 'issues' && !r.issues.length) { return false; }
+					if (schemaFilter === 'done' && r.issues.length) { return false; }
 					if (!term) { return true; }
 					return r.title.toLowerCase().indexOf(term) > -1 ||
 						(r.slug && r.slug.toLowerCase().indexOf(term) > -1) ||
@@ -1158,10 +1171,15 @@
 					var v = sorter(a, b);
 					return schemaSort.dir === 'asc' ? v : -v;
 				});
+				var empty = schemaFilter === 'issues'
+					? 'Nenhuma página com pendências de schema. 🎉'
+					: (schemaFilter === 'done' ? 'Nenhuma página completa ainda.' : 'Nenhuma página corresponde à busca.');
 				var tbody = $('#ce-schema-tbody');
 				tbody.innerHTML = list.length
 					? list.map(schemaRowHtml).join('')
-					: '<tr><td colspan="6"><div class="ce-empty" style="padding:20px 0"><p>Nenhuma página corresponde à busca.</p></div></td></tr>';
+					: '<tr><td colspan="6"><div class="ce-empty" style="padding:20px 0"><p>' + empty + '</p></div></td></tr>';
+				var cnt = $('#ce-schema-count');
+				if (cnt) { cnt.textContent = list.length + ' de ' + results.length + ' página(s)'; }
 				bindRows();
 				var all = $('#ce-schema-selall');
 				if (all) { all.checked = false; }
@@ -1176,6 +1194,10 @@
 				refreshSchemaSel();
 			});
 			$('#ce-schema-search').addEventListener('input', applyView);
+			$('#ce-schema-filter').addEventListener('change', function () {
+				schemaFilter = this.value;
+				applyView();
+			});
 			$$('#ce-schema-results .ce-th-sort').forEach(function (th) {
 				var handler = function () {
 					var c = schemaHeadCols[+th.dataset.schemacol];

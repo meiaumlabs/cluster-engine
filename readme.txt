@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.25.0
+Stable tag: 2.26.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.26.0 =
+* Novo: **filtro por status** na página de Schema — "Somente com pendências" (padrão), "Todas as páginas" ou "Somente completas", para focar direto nas páginas que precisam de correção.
+* Melhoria: após corrigir o schema de uma página (Article, FAQ, reparo ou remoção), a página é re-auditada e sai automaticamente da lista de pendências — o status é atualizado na hora.
+* Melhoria: contador dinâmico mostrando quantas páginas correspondem ao filtro/busca atuais.
 
 = 2.25.0 =
 * Novo: a página de Schema agora mostra o **slug** de cada página (com link para abrir a URL).
