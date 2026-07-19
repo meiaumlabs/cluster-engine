@@ -115,6 +115,21 @@ class CE61_Schema {
 			}
 		}
 
+		// Schema exposto como texto no corpo: JSON-LD pelado (sem <script>) ou
+		// blocos <script> deixados dentro do conteúdo. A leitura da página
+		// renderizada não pega o JSON pelado, então checamos o post_content.
+		$post = get_post( $post_id );
+		if ( $post ) {
+			$body = (string) $post->post_content;
+			$has_inline_script = (bool) preg_match( '/<script[^>]*type=["\']application\/ld\+json["\']/i', $body );
+			$stripped = preg_replace( '/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>.*?<\/script>/is', '', $body );
+			if ( $has_inline_script || self::has_naked_jsonld( (string) $stripped ) ) {
+				if ( ! in_array( 'exposed_schema', $issues, true ) ) {
+					$issues[] = 'exposed_schema';
+				}
+			}
+		}
+
 		$audit = array(
 			'types'      => array_values( $found ),
 			'issues'     => $issues,
@@ -286,6 +301,105 @@ class CE61_Schema {
 		return $schema;
 	}
 
+	/* ---------- Campo nativo de schema do Cluster Engine ---------- */
+
+	/**
+	 * Chave do campo personalizado (postmeta) onde o Cluster Engine guarda o
+	 * schema JSON-LD quando não há Rank Math. Estrutura: mapa [ Tipo => nó ],
+	 * ex.: { "BlogPosting": {...}, "FAQPage": {...} }. O nó é gravado sem
+	 * @context (adicionado na saída) e reexecutar um tipo atualiza em vez de
+	 * duplicar. A saída acontece no wp_head como <script type="application/ld+json">,
+	 * então o código NUNCA aparece como texto dentro do conteúdo do post.
+	 */
+	const NATIVE_META = '_ce61_schema';
+
+	/**
+	 * Lê o mapa de schema nativo do post. Retorna [] se não houver.
+	 */
+	public static function get_native_schema( $post_id ) {
+		$raw  = get_post_meta( $post_id, self::NATIVE_META, true );
+		$data = $raw ? json_decode( $raw, true ) : array();
+		return is_array( $data ) ? $data : array();
+	}
+
+	/**
+	 * Grava/atualiza um nó no campo nativo, indexado por @type.
+	 */
+	public static function save_native_schema( $post_id, $type, $node ) {
+		$type = preg_replace( '/[^A-Za-z0-9]/', '', (string) $type );
+		if ( '' === $type || ! is_array( $node ) ) {
+			return false;
+		}
+		unset( $node['@context'] ); // adicionado na saída (render_head).
+		$node['@type'] = $type;
+		$map           = self::get_native_schema( $post_id );
+		$map[ $type ]  = $node;
+		update_post_meta( $post_id, self::NATIVE_META, wp_json_encode( $map, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
+		return true;
+	}
+
+	/**
+	 * Remove um tipo (ou todo o campo, se $type vazio) do schema nativo.
+	 */
+	public static function delete_native_schema( $post_id, $type = '' ) {
+		if ( '' === $type ) {
+			delete_post_meta( $post_id, self::NATIVE_META );
+			return;
+		}
+		$type = preg_replace( '/[^A-Za-z0-9]/', '', (string) $type );
+		$map  = self::get_native_schema( $post_id );
+		unset( $map[ $type ] );
+		if ( $map ) {
+			update_post_meta( $post_id, self::NATIVE_META, wp_json_encode( $map, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) );
+		} else {
+			delete_post_meta( $post_id, self::NATIVE_META );
+		}
+	}
+
+	/**
+	 * Imprime o schema nativo como <script type="application/ld+json"> no <head>
+	 * das páginas singulares. Com Rank Math ativo, o schema vive no campo do
+	 * Rank Math (que já cuida da saída), então aqui não fazemos nada para evitar
+	 * duplicidade. Barras são escapadas (sem JSON_UNESCAPED_SLASHES) para que um
+	 * eventual "</script>" no conteúdo não quebre a tag.
+	 *
+	 * Registrado em cluster-engine.php: add_action( 'wp_head', ..., 91 ).
+	 */
+	public static function render_head() {
+		if ( self::is_rankmath() || ! is_singular() ) {
+			return;
+		}
+		$post_id = get_queried_object_id();
+		if ( ! $post_id ) {
+			return;
+		}
+		$map = self::get_native_schema( $post_id );
+		if ( ! $map ) {
+			return;
+		}
+		foreach ( $map as $node ) {
+			if ( ! is_array( $node ) ) {
+				continue;
+			}
+			if ( empty( $node['@context'] ) ) {
+				$node = array( '@context' => 'https://schema.org' ) + $node;
+			}
+			echo "\n" . '<script type="application/ld+json">' . wp_json_encode( $node, JSON_UNESCAPED_UNICODE ) . '</script>' . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		}
+	}
+
+	/**
+	 * Grava um nó de schema no destino correto: campo do Rank Math quando ele
+	 * está ativo, senão o campo nativo. Ponto único usado por toda inserção e
+	 * pelo reparo, garantindo que o schema nunca fique como texto no conteúdo.
+	 */
+	public static function store_node( $post_id, $type, $node, $title = '' ) {
+		if ( self::is_rankmath() ) {
+			return self::save_rm_schema( $post_id, $type, $node, $title ? $title : $type, false );
+		}
+		return self::save_native_schema( $post_id, $type, $node );
+	}
+
 	/* ---------- Integração com o campo de schema do Rank Math ---------- */
 
 	/**
@@ -372,6 +486,13 @@ class CE61_Schema {
 					return true;
 				}
 			}
+		} else {
+			$native = self::get_native_schema( $post_id );
+			foreach ( array( 'BlogPosting', 'Article', 'NewsArticle' ) as $t ) {
+				if ( isset( $native[ $t ] ) ) {
+					return true;
+				}
+			}
 		}
 		$post = get_post( $post_id );
 		if ( $post && ( false !== stripos( $post->post_content, 'BlogPosting' ) || false !== stripos( $post->post_content, '"Article"' ) ) ) {
@@ -398,6 +519,7 @@ class CE61_Schema {
 			}
 		}
 		delete_post_meta( $post_id, '_ce61_rm_schema_keys' );
+		self::delete_native_schema( $post_id ); // campo nativo do Cluster Engine.
 		self::strip_content_schema( $post_id, array() );
 		return 'removed';
 	}
@@ -426,20 +548,18 @@ class CE61_Schema {
 			return 'inserted';
 		}
 
-		$block   = "\n" . '<script type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) . '</script>';
-		$content = $post->post_content . $block;
-		$result  = wp_update_post( array( 'ID' => $post_id, 'post_content' => wp_slash( $content ) ), true );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
+		// Sem Rank Math: grava no campo nativo (_ce61_schema), que é impresso
+		// como <script> no <head>. Nunca injeta JSON-LD no corpo do post.
+		self::save_native_schema( $post_id, 'BlogPosting', $schema );
+		self::strip_content_schema( $post_id, array( 'BlogPosting', '"Article"', 'NewsArticle' ) );
 		return 'inserted';
 	}
 
 	/**
-	 * Aplica a FAQ gerada por IA. Com Rank Math ativo, extrai o FAQPage do
-	 * JSON-LD e grava no campo de schema do Rank Math (não como <script> no
-	 * conteúdo), adicionando ao corpo apenas a seção de perguntas visível. Sem
-	 * Rank Math, mantém o comportamento antigo (FAQ + JSON-LD no conteúdo).
+	 * Aplica a FAQ gerada por IA. Extrai o FAQPage do JSON-LD e grava no campo
+	 * de schema (Rank Math quando ativo, senão o campo nativo do Cluster Engine),
+	 * adicionando ao corpo apenas a seção de perguntas visível — o JSON-LD nunca
+	 * fica como <script> nem como texto dentro do conteúdo.
 	 */
 	public static function apply_faq( $post_id, $ai_html ) {
 		$post = get_post( $post_id );
@@ -448,11 +568,7 @@ class CE61_Schema {
 		}
 		$html = preg_replace( '/^```(?:html)?\s*|\s*```$/i', '', trim( (string) $ai_html ) );
 
-		if ( ! self::is_rankmath() ) {
-			return self::append_html( $post_id, $html );
-		}
-
-		// Extrai as perguntas do(s) bloco(s) FAQPage em JSON-LD.
+		// Extrai as perguntas do(s) bloco(s) FAQPage em JSON-LD (independe de Rank Math).
 		$main_entity = array();
 		if ( preg_match_all( '/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/is', $html, $mm ) ) {
 			foreach ( $mm[1] as $block ) {
@@ -480,12 +596,14 @@ class CE61_Schema {
 			}
 		}
 
-		// Sem JSON-LD utilizável: cai no comportamento padrão (grava no conteúdo).
+		// Sem JSON-LD utilizável: só o HTML visível vai para o corpo. O append_html
+		// já colhe qualquer JSON-LD residual para o campo, nunca deixando texto cru.
 		if ( empty( $main_entity ) ) {
 			return self::append_html( $post_id, $html );
 		}
 
-		self::save_rm_schema( $post_id, 'FAQPage', array( 'mainEntity' => $main_entity ), 'FAQ', false );
+		// Grava o FAQPage no campo (Rank Math ou nativo) — nunca como <script> no corpo.
+		self::store_node( $post_id, 'FAQPage', array( '@type' => 'FAQPage', 'mainEntity' => $main_entity ), 'FAQ' );
 
 		// Só a FAQ visível (sem o <script>) vai para o corpo do post.
 		$visible = preg_replace( '/\s*<script[^>]*type=["\']application\/ld\+json["\'][^>]*>.*?<\/script>/is', '', $html );
@@ -513,8 +631,16 @@ class CE61_Schema {
 		}
 		// Strip markdown fences the model may add.
 		$html = preg_replace( '/^```(?:html)?\s*|\s*```$/i', '', trim( $html ) );
+		// Colhe qualquer JSON-LD embutido para o campo de schema e remove os
+		// blocos <script> do HTML. Isso evita o bug em que o wp_kses_post abaixo
+		// removeria a tag <script> e deixaria o JSON como texto puro no corpo.
+		$html = self::harvest_jsonld( $post_id, $html );
 		if ( ! current_user_can( 'unfiltered_html' ) ) {
 			$html = wp_kses_post( $html ); // scripts stripped for restricted users.
+		}
+		$html = trim( (string) $html );
+		if ( '' === $html ) {
+			return 'inserted'; // só havia JSON-LD; já foi para o campo.
 		}
 		$content = $post->post_content . "\n" . $html;
 		$result  = wp_update_post( array( 'ID' => $post_id, 'post_content' => wp_slash( $content ) ), true );
@@ -522,5 +648,181 @@ class CE61_Schema {
 			return $result;
 		}
 		return 'inserted';
+	}
+
+	/**
+	 * Move todo JSON-LD embutido em <script> do HTML para o campo de schema
+	 * (Rank Math ou nativo) e devolve o HTML sem esses blocos — garantindo que
+	 * o JSON nunca sobre como texto no corpo do post, mesmo após sanitização.
+	 */
+	private static function harvest_jsonld( $post_id, $html ) {
+		if ( ! preg_match_all( '/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/is', (string) $html, $m ) ) {
+			return $html;
+		}
+		foreach ( $m[1] as $block ) {
+			$data = json_decode( trim( $block ), true );
+			if ( ! is_array( $data ) ) {
+				continue;
+			}
+			$nodes = array();
+			self::collect_nodes( $data, $nodes );
+			foreach ( $nodes as $node ) {
+				if ( empty( $node['@type'] ) ) {
+					continue;
+				}
+				$type = is_array( $node['@type'] ) ? reset( $node['@type'] ) : $node['@type'];
+				self::store_node( $post_id, $type, $node );
+			}
+		}
+		$html = preg_replace( '/\s*<script[^>]*type=["\']application\/ld\+json["\'][^>]*>.*?<\/script>/is', '', $html );
+		return (string) $html;
+	}
+
+	/* ---------- Reparo de schema exposto no corpo do post ---------- */
+
+	/**
+	 * Repara schema exposto no conteúdo do post movendo-o para o campo de schema
+	 * (Rank Math ou nativo) e limpando o corpo. Trata dois casos:
+	 *   1) blocos <script type="application/ld+json"> dentro do conteúdo;
+	 *   2) JSON-LD "pelado" — texto puro sem <script>, resultado de uma
+	 *      sanitização que removeu a tag e deixou o JSON visível.
+	 * Retorna [ 'moved' => int, 'naked' => int ] ou WP_Error.
+	 */
+	public static function repair_content_schema( $post_id ) {
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			return new WP_Error( 'ce61_no_post', __( 'Post não encontrado.', 'cluster-engine' ) );
+		}
+		$content = (string) $post->post_content;
+		$moved   = 0;
+		$naked   = 0;
+
+		// 1) Blocos <script> JSON-LD → campo, depois removidos do corpo.
+		if ( preg_match_all( '/<script[^>]*type=["\']application\/ld\+json["\'][^>]*>(.*?)<\/script>/is', $content, $m ) ) {
+			foreach ( $m[1] as $block ) {
+				$data = json_decode( trim( $block ), true );
+				if ( ! is_array( $data ) ) {
+					continue;
+				}
+				$nodes = array();
+				self::collect_nodes( $data, $nodes );
+				foreach ( $nodes as $node ) {
+					if ( empty( $node['@type'] ) ) {
+						continue;
+					}
+					$type = is_array( $node['@type'] ) ? reset( $node['@type'] ) : $node['@type'];
+					self::store_node( $post_id, $type, $node );
+					$moved++;
+				}
+			}
+			$content = preg_replace( '/\s*<script[^>]*type=["\']application\/ld\+json["\'][^>]*>.*?<\/script>/is', '', $content );
+		}
+
+		// 2) JSON-LD pelado (sem <script>).
+		foreach ( self::extract_naked_jsonld( $content ) as $item ) {
+			$nodes = array();
+			self::collect_nodes( $item['json'], $nodes );
+			foreach ( $nodes as $node ) {
+				if ( empty( $node['@type'] ) ) {
+					continue;
+				}
+				$type = is_array( $node['@type'] ) ? reset( $node['@type'] ) : $node['@type'];
+				self::store_node( $post_id, $type, $node );
+			}
+			$content = str_replace( $item['raw'], '', $content );
+			$naked++;
+		}
+
+		if ( ( $moved + $naked ) > 0 ) {
+			$content = preg_replace( '#<p>\s*</p>#i', '', $content );        // parágrafos que ficaram vazios.
+			$content = preg_replace( "/\n{3,}/", "\n\n", (string) $content );
+			wp_update_post( array( 'ID' => $post_id, 'post_content' => wp_slash( trim( $content ) ) ), false );
+		}
+		return array( 'moved' => $moved, 'naked' => $naked );
+	}
+
+	/**
+	 * Há JSON-LD pelado (texto cru schema.org fora de <script>) no HTML dado?
+	 * Espera-se que o chamador já tenha removido os blocos <script>.
+	 */
+	public static function has_naked_jsonld( $html ) {
+		return ! empty( self::extract_naked_jsonld( (string) $html ) );
+	}
+
+	/**
+	 * Localiza objetos JSON-LD "pelados" (schema.org como texto puro) no HTML.
+	 * Assume que blocos <script> já foram removidos. Para cada ocorrência de
+	 * "schema.org", encontra a chave de abertura anterior e faz o balanceamento
+	 * de chaves (respeitando strings) para isolar o objeto completo. Retorna
+	 * [ [ 'raw' => trecho original, 'json' => array decodificado ], ... ].
+	 */
+	private static function extract_naked_jsonld( $content ) {
+		$out    = array();
+		$offset = 0;
+		$len    = strlen( $content );
+		$seen   = array();
+		while ( $offset < $len ) {
+			$pos = stripos( $content, 'schema.org', $offset );
+			if ( false === $pos ) {
+				break;
+			}
+			$start = strrpos( substr( $content, 0, $pos ), '{' );
+			if ( false === $start ) {
+				$offset = $pos + 10;
+				continue;
+			}
+			$end = self::match_brace( $content, $start );
+			if ( false === $end ) {
+				$offset = $pos + 10;
+				continue;
+			}
+			$raw     = substr( $content, $start, $end - $start + 1 );
+			$decoded = json_decode( html_entity_decode( $raw, ENT_QUOTES, 'UTF-8' ), true );
+			if ( is_array( $decoded ) && ( isset( $decoded['@context'] ) || isset( $decoded['@type'] ) || isset( $decoded['@graph'] ) ) ) {
+				if ( ! isset( $seen[ $raw ] ) ) {
+					$out[]        = array( 'raw' => $raw, 'json' => $decoded );
+					$seen[ $raw ] = 1;
+				}
+				$offset = $end + 1;
+			} else {
+				$offset = $pos + 10;
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Dado o índice de uma "{" em $s, devolve o índice da "}" que a fecha,
+	 * respeitando strings entre aspas e escapes. false se não fechar.
+	 */
+	private static function match_brace( $s, $start ) {
+		$len    = strlen( $s );
+		$depth  = 0;
+		$in_str = false;
+		$esc    = false;
+		for ( $i = $start; $i < $len; $i++ ) {
+			$ch = $s[ $i ];
+			if ( $in_str ) {
+				if ( $esc ) {
+					$esc = false;
+				} elseif ( '\\' === $ch ) {
+					$esc = true;
+				} elseif ( '"' === $ch ) {
+					$in_str = false;
+				}
+				continue;
+			}
+			if ( '"' === $ch ) {
+				$in_str = true;
+			} elseif ( '{' === $ch ) {
+				$depth++;
+			} elseif ( '}' === $ch ) {
+				$depth--;
+				if ( 0 === $depth ) {
+					return $i;
+				}
+			}
+		}
+		return false;
 	}
 }

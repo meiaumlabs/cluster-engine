@@ -16,7 +16,7 @@ class CE61_Ajax {
 			'scan_index', 'scan_relations', 'scan_cluster', 'scan_finalize',
 			'dashboard', 'clusters', 'cluster_detail', 'links', 'diagnostics', 'keywords', 'report',
 			'ai_run', 'test_ai', 'apply_meta', 'dismiss_relation', 'create_draft', 'insert_link',
-			'merge_apply', 'schema_scan', 'schema_results', 'schema_fix_article', 'schema_fix_faq', 'schema_post_types', 'schema_queue_add', 'schema_remove',
+			'merge_apply', 'schema_scan', 'schema_results', 'schema_fix_article', 'schema_fix_faq', 'schema_post_types', 'schema_queue_add', 'schema_remove', 'schema_repair',
 			'headings_preview', 'apply_headings',
 			'images_list', 'image_prompt', 'image_generate', 'images_queue_add',
 			'stock_search', 'stock_apply', 'stock_status',
@@ -659,20 +659,43 @@ class CE61_Ajax {
 	}
 
 	/**
-	 * Enfileira correções de schema em massa (Inserir Article ou Gerar FAQ + schema)
-	 * para os posts selecionados, processadas em segundo plano pelo WP-Cron.
+	 * Corrige o schema exposto no corpo de UMA página: move os blocos JSON-LD
+	 * (ou o JSON "pelado", sem <script>) para o campo de schema e limpa o corpo.
+	 */
+	public static function schema_repair() {
+		self::guard();
+		$pid = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		if ( ! $pid || ! get_post( $pid ) ) {
+			wp_send_json_error( array( 'message' => __( 'Página inválida.', 'cluster-engine' ) ) );
+		}
+		$r = CE61_Schema::repair_content_schema( $pid );
+		if ( is_wp_error( $r ) ) {
+			wp_send_json_error( array( 'message' => $r->get_error_message() ) );
+		}
+		CE61_Schema::audit_post( $pid );
+		wp_send_json_success( array( 'moved' => $r['moved'], 'naked' => $r['naked'] ) );
+	}
+
+	/**
+	 * Enfileira correções de schema em massa (Inserir Article, Gerar FAQ + schema
+	 * ou Corrigir schema exposto) para os posts selecionados, processadas em
+	 * segundo plano pelo WP-Cron.
 	 */
 	public static function schema_queue_add() {
 		self::guard();
 		$ids  = isset( $_POST['post_ids'] ) ? json_decode( wp_unslash( $_POST['post_ids'] ), true ) : null;
 		$mode = isset( $_POST['mode'] ) ? sanitize_key( $_POST['mode'] ) : 'article';
-		if ( ! in_array( $mode, array( 'article', 'faq' ), true ) ) {
+		if ( ! in_array( $mode, array( 'article', 'faq', 'repair' ), true ) ) {
 			$mode = 'article';
 		}
 		if ( ! is_array( $ids ) || ! $ids ) {
 			wp_send_json_error( array( 'message' => __( 'Nenhuma página selecionada.', 'cluster-engine' ) ) );
 		}
-		$label = 'faq' === $mode ? __( 'FAQ + schema', 'cluster-engine' ) : __( 'Inserir Article', 'cluster-engine' );
+		$labels = array(
+			'faq'    => __( 'FAQ + schema', 'cluster-engine' ),
+			'repair' => __( 'Corrigir schema exposto', 'cluster-engine' ),
+		);
+		$label = isset( $labels[ $mode ] ) ? $labels[ $mode ] : __( 'Inserir Article', 'cluster-engine' );
 		$added = 0;
 		foreach ( array_slice( $ids, 0, 200 ) as $pid ) {
 			$pid = absint( $pid );

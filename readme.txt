@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.23.1
+Stable tag: 2.24.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.24.0 =
+* Correção importante: sem Rank Math, o schema JSON-LD deixava de ser injetado como texto no corpo do post. Agora ele é gravado em um **campo personalizado do Cluster Engine** (`_ce61_schema`) e impresso como `<script type="application/ld+json">` no `<head>` da página — nunca mais aparece como código visível no conteúdo.
+* Correção da causa raiz: para usuários sem a permissão `unfiltered_html`, o `wp_kses_post` removia a tag `<script>` e deixava o JSON exposto como texto. Toda inserção de schema (Article, FAQ) agora passa pelo campo, então isso não acontece mais.
+* Novo: mecanismo de **reparo de schema exposto**. A auditoria detecta páginas com JSON-LD exposto (como texto puro ou blocos `<script>` no conteúdo) e um botão "⚠ Corrigir schema exposto" move o schema para o campo e limpa o corpo do post. Disponível por página e em massa (via Fila de Geração).
 
 = 2.23.1 =
 * Melhoria: o campo de busca do painel de Desempenho agora filtra também por slug e URL (permalink), além de título e keyword.

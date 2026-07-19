@@ -749,7 +749,7 @@
 
 	/* ---------- Global delegated clicks: works for any dynamically rendered button ---------- */
 	document.addEventListener('click', function (e) {
-		var t = e.target.closest ? e.target.closest('[data-ai],[data-anchor],[data-dismiss],[data-open],[data-pillar],[data-merge],[data-goto],[data-fixschema-article],[data-fixschema-faq],[data-schema-remove],[data-fixheadings],[data-imggen],[data-imgview]') : null;
+		var t = e.target.closest ? e.target.closest('[data-ai],[data-anchor],[data-dismiss],[data-open],[data-pillar],[data-merge],[data-goto],[data-fixschema-article],[data-fixschema-faq],[data-schema-remove],[data-schema-repair],[data-fixheadings],[data-imggen],[data-imgview]') : null;
 		if (!t || t.disabled) { return; }
 		if (t.dataset.goto) {
 			var parts = t.dataset.goto.split('#');
@@ -766,6 +766,7 @@
 		if (t.dataset.fixschemaArticle) { runSchemaFix(t, 'article'); return; }
 		if (t.dataset.fixschemaFaq) { runSchemaFix(t, 'faq'); return; }
 		if (t.dataset.schemaRemove) { runSchemaRemove(t); return; }
+		if (t.dataset.schemaRepair) { runSchemaRepair(t); return; }
 		if (t.dataset.ai) { runAIAction(t); return; }
 		if (t.dataset.anchor) { runAnchorAction(t); return; }
 		if (t.dataset.merge) { runMergeAction(t); return; }
@@ -963,7 +964,8 @@
 		no_schema: 'Nenhum schema na página', broken_schema: 'Schema quebrado (JSON inválido)',
 		no_article_schema: 'Sem schema Article/BlogPosting', article_no_author: 'Article sem autor (E-E-A-T)',
 		article_no_date: 'Article sem datePublished', article_no_image: 'Article sem imagem',
-		no_faq_schema: 'Sem schema FAQPage', no_breadcrumb: 'Sem BreadcrumbList', fetch_failed: 'Não foi possível ler a página'
+		no_faq_schema: 'Sem schema FAQPage', no_breadcrumb: 'Sem BreadcrumbList', fetch_failed: 'Não foi possível ler a página',
+		exposed_schema: 'Schema exposto como texto no conteúdo'
 	};
 
 	function renderSchema() {
@@ -1039,12 +1041,16 @@
 					? r.types.map(function (t) { return '<span class="ce-chip ce-chip-green">' + esc(t) + '</span>'; }).join('')
 					: '<span class="ce-chip ce-chip-red">nenhum</span>';
 				var issues = r.issues.map(function (i) {
-					var cls = /broken|no_schema|no_article|fetch/.test(i) ? 'ce-chip-red' : 'ce-chip-amber';
+					var cls = /broken|no_schema|no_article|fetch|exposed/.test(i) ? 'ce-chip-red' : 'ce-chip-amber';
 					return '<span class="ce-chip ' + cls + '">' + (schemaIssueLabels[i] || i) + '</span>';
 				}).join('') || '<span class="ce-chip ce-chip-green">completo</span>';
 				var canArticle = r.issues.indexOf('no_article_schema') > -1 || r.issues.indexOf('no_schema') > -1;
 				var canFaq = r.issues.indexOf('no_faq_schema') > -1;
+				var canRepair = r.issues.indexOf('exposed_schema') > -1;
 				var actions = '';
+				if (canRepair) {
+					actions += '<button class="ce-btn ce-btn-sm ce-btn-primary" data-schema-repair="' + r.post_id + '" title="Move o JSON-LD que está aparecendo como texto no conteúdo para o campo de schema e limpa o corpo do post">⚠ Corrigir schema exposto</button> ';
+				}
 				if (canArticle) {
 					actions += '<button class="ce-btn ce-btn-sm" data-fixschema-article="' + r.post_id + '">◈ Inserir Article</button> ';
 				}
@@ -1054,8 +1060,8 @@
 				if (r.types.length) {
 					actions += '<button class="ce-btn ce-btn-sm ce-btn-ghost" data-schema-remove="' + r.post_id + '" title="Remove o schema gerado pelo Cluster Engine (campo do Rank Math e blocos no conteúdo)">✕ Remover schema</button>';
 				}
-				var check = (canArticle || canFaq)
-					? '<input type="checkbox" class="ce-schema-sel" value="' + r.post_id + '" data-article="' + (canArticle ? 1 : 0) + '" data-faq="' + (canFaq ? 1 : 0) + '">'
+				var check = (canArticle || canFaq || canRepair)
+					? '<input type="checkbox" class="ce-schema-sel" value="' + r.post_id + '" data-article="' + (canArticle ? 1 : 0) + '" data-faq="' + (canFaq ? 1 : 0) + '" data-repair="' + (canRepair ? 1 : 0) + '">'
 					: '';
 				return '<tr id="ce-schema-row-' + r.post_id + '">' +
 					'<td style="width:32px;text-align:center">' + check + '</td>' +
@@ -1068,7 +1074,7 @@
 			var rankmath = /rank\s*math/i.test(CE61.seoPlugin || '');
 			var rmNote = rankmath
 				? '<p class="ce-sub" style="margin:0 0 12px">◈ Rank Math detectado: o schema é gravado no <b>campo de schema do Rank Math</b> (não como texto no conteúdo).</p>'
-				: '';
+				: '<p class="ce-sub" style="margin:0 0 12px">◈ O schema é gravado em um <b>campo personalizado do Cluster Engine</b> e impresso como JSON-LD no &lt;head&gt; da página — nunca como texto dentro do conteúdo.</p>';
 			box.innerHTML =
 				'<div class="ce-card ce-table-wrap">' +
 				'<p style="margin:0 0 12px"><b style="font-family:var(--ce-display)">' + withIssues + '</b> de ' + d.results.length + ' páginas com pendências de schema</p>' +
@@ -1078,6 +1084,7 @@
 					'<select class="ce-select" id="ce-schema-bulk-mode" style="max-width:240px">' +
 						'<option value="article">◈ Inserir Article (sem IA)</option>' +
 						'<option value="faq">✍ Gerar FAQ + schema (IA)</option>' +
+						'<option value="repair">⚠ Corrigir schema exposto (sem IA)</option>' +
 					'</select>' +
 					'<button class="ce-btn ce-btn-primary ce-btn-sm" id="ce-schema-bulk-go">⧗ Adicionar à fila (<span id="ce-schema-selcount">0</span>)</button>' +
 					'<span class="ce-sub" id="ce-schema-bulk-hint">Marque as páginas e processe as correções em segundo plano pela Fila de Geração</span>' +
@@ -1100,7 +1107,7 @@
 			$$('.ce-schema-sel').forEach(function (c) { c.addEventListener('change', refreshSchemaSel); });
 			goBtn.addEventListener('click', function () {
 				var mode = $('#ce-schema-bulk-mode').value;
-				var attr = mode === 'faq' ? 'faq' : 'article';
+				var attr = mode; // 'article' | 'faq' | 'repair' — casa com data-<attr> das checkboxes.
 				var picked = schemaSel();
 				var ids = picked.filter(function (c) { return c.dataset[attr] === '1'; }).map(function (c) { return c.value; });
 				var skipped = picked.length - ids.length;
@@ -1184,6 +1191,22 @@
 			btn.disabled = false;
 			btn.textContent = '✕ Remover schema';
 			modal('<h3 class="ce-h2">Não foi possível remover</h3><p>' + esc(e.message) + '</p>');
+		});
+	}
+
+	/* Move o JSON-LD exposto (texto no conteúdo) para o campo de schema. */
+	function runSchemaRepair(btn) {
+		var pid = btn.dataset.schemaRepair;
+		btn.disabled = true;
+		btn.textContent = 'Corrigindo…';
+		api('schema_repair', { post_id: pid }).then(function (r) {
+			var n = (r.moved || 0) + (r.naked || 0);
+			toast(n ? (n + ' bloco(s) de schema movido(s) para o campo') : 'Nada exposto a corrigir');
+			loadSchemaResults();
+		}).catch(function (e) {
+			btn.disabled = false;
+			btn.textContent = '⚠ Corrigir schema exposto';
+			modal('<h3 class="ce-h2">Não foi possível corrigir</h3><p>' + esc(e.message) + '</p>');
 		});
 	}
 

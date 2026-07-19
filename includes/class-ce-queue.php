@@ -311,6 +311,8 @@ class CE61_Queue {
 				return $ai;
 			}
 			$result = CE61_Schema::apply_faq( $post_id, $ai );
+		} elseif ( 'repair' === $mode ) {
+			$result = CE61_Schema::repair_content_schema( $post_id );
 		} else {
 			$result = CE61_Schema::insert_article_schema( $post_id );
 		}
