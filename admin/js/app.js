@@ -1028,6 +1028,83 @@
 		}).catch(function (e) { box.innerHTML = '<p class="ce-sub">' + esc(e.message) + '</p>'; });
 	}
 
+	/* Colunas ordenáveis do cabeçalho da tabela de schema.
+	   key = campo do resultado; def = direção do primeiro clique. */
+	var schemaHeadCols = [
+		{ label: 'Página',           key: 'title',  def: 'asc' },
+		{ label: 'Slug',             key: 'slug',   def: 'asc' },
+		{ label: 'Schema encontrado', key: 'types',  def: 'desc' },
+		{ label: 'Pendências',       key: 'issues', def: 'desc' }
+	];
+	var schemaSort = { key: 'issues', dir: 'desc' };
+
+	var schemaSorters = {
+		title:  function (a, b) { return a.title.localeCompare(b.title, 'pt-BR'); },
+		slug:   function (a, b) { return (a.slug || '').localeCompare(b.slug || '', 'pt-BR'); },
+		types:  function (a, b) { return a.types.length - b.types.length; },
+		issues: function (a, b) { return a.issues.length - b.issues.length; }
+	};
+
+	function schemaRowHtml(r) {
+		var types = r.types.length
+			? r.types.map(function (t) { return '<span class="ce-chip ce-chip-green">' + esc(t) + '</span>'; }).join('')
+			: '<span class="ce-chip ce-chip-red">nenhum</span>';
+		var issues = r.issues.map(function (i) {
+			var cls = /broken|no_schema|no_article|fetch|exposed/.test(i) ? 'ce-chip-red' : 'ce-chip-amber';
+			return '<span class="ce-chip ' + cls + '">' + (schemaIssueLabels[i] || i) + '</span>';
+		}).join('') || '<span class="ce-chip ce-chip-green">completo</span>';
+		var canArticle = r.issues.indexOf('no_article_schema') > -1 || r.issues.indexOf('no_schema') > -1;
+		var canFaq = r.issues.indexOf('no_faq_schema') > -1;
+		var canRepair = r.issues.indexOf('exposed_schema') > -1;
+		var actions = '';
+		if (canRepair) {
+			actions += '<button class="ce-btn ce-btn-sm ce-btn-primary" data-schema-repair="' + r.post_id + '" title="Move o JSON-LD que está aparecendo como texto no conteúdo para o campo de schema e limpa o corpo do post">⚠ Corrigir schema exposto</button> ';
+		}
+		if (canArticle) {
+			actions += '<button class="ce-btn ce-btn-sm" data-fixschema-article="' + r.post_id + '">◈ Inserir Article</button> ';
+		}
+		if (canFaq) {
+			actions += '<button class="ce-btn ce-btn-sm" data-fixschema-faq="' + r.post_id + '">✍ Gerar FAQ + schema</button> ';
+		}
+		if (r.types.length) {
+			actions += '<button class="ce-btn ce-btn-sm ce-btn-ghost" data-schema-remove="' + r.post_id + '" title="Remove o schema gerado pelo Cluster Engine (campo do Rank Math e blocos no conteúdo)">✕ Remover schema</button>';
+		}
+		var check = (canArticle || canFaq || canRepair)
+			? '<input type="checkbox" class="ce-schema-sel" value="' + r.post_id + '" data-article="' + (canArticle ? 1 : 0) + '" data-faq="' + (canFaq ? 1 : 0) + '" data-repair="' + (canRepair ? 1 : 0) + '">'
+			: '';
+		var slug = r.slug
+			? '<a href="' + esc(r.url) + '" target="_blank" rel="noopener" title="Abrir a página"><code>' + esc(r.slug) + '</code></a>'
+			: '<span class="ce-sub">—</span>';
+		return '<tr id="ce-schema-row-' + r.post_id + '">' +
+			'<td style="width:32px;text-align:center">' + check + '</td>' +
+			'<td><a href="' + esc(r.edit) + '" target="_blank" rel="noopener">' + esc(r.title) + '</a></td>' +
+			'<td style="max-width:220px;word-break:break-all">' + slug + '</td>' +
+			'<td>' + types + '</td>' +
+			'<td style="max-width:280px">' + issues + '</td>' +
+			'<td style="white-space:nowrap">' + actions + '</td>' +
+		'</tr>';
+	}
+
+	function schemaHeadHtml() {
+		var cells = '<th style="width:32px"></th>';
+		schemaHeadCols.forEach(function (c, i) {
+			cells += '<th class="ce-th-sort" data-schemacol="' + i + '" tabindex="0" role="button" title="Ordenar por ' + esc(c.label) + '">' +
+				'<span class="ce-th-label">' + esc(c.label) + '</span>' +
+				'<span class="ce-th-arrow" aria-hidden="true"></span>' +
+			'</th>';
+		});
+		cells += '<th>Corrigir</th>';
+		return cells;
+	}
+
+	function updateSchemaHeadSort() {
+		$$('#ce-schema-results .ce-th-sort').forEach(function (th) {
+			var c = schemaHeadCols[+th.dataset.schemacol];
+			th.classList.remove('is-asc', 'is-desc');
+			if (c.key === schemaSort.key) { th.classList.add(schemaSort.dir === 'asc' ? 'is-asc' : 'is-desc'); }
+		});
+	}
+
 	function loadSchemaResults() {
 		var box = $('#ce-schema-results');
 		api('schema_results', {}).then(function (d) {
@@ -1035,49 +1112,15 @@
 				box.innerHTML = '<div class="ce-empty"><h3>Nenhuma auditoria ainda</h3><p>Clique em Auditar schema das páginas para o plugin ler o JSON-LD renderizado de cada post.</p></div>';
 				return;
 			}
-			var withIssues = d.results.filter(function (r) { return r.issues.length; }).length;
-			var rows = d.results.map(function (r) {
-				var types = r.types.length
-					? r.types.map(function (t) { return '<span class="ce-chip ce-chip-green">' + esc(t) + '</span>'; }).join('')
-					: '<span class="ce-chip ce-chip-red">nenhum</span>';
-				var issues = r.issues.map(function (i) {
-					var cls = /broken|no_schema|no_article|fetch|exposed/.test(i) ? 'ce-chip-red' : 'ce-chip-amber';
-					return '<span class="ce-chip ' + cls + '">' + (schemaIssueLabels[i] || i) + '</span>';
-				}).join('') || '<span class="ce-chip ce-chip-green">completo</span>';
-				var canArticle = r.issues.indexOf('no_article_schema') > -1 || r.issues.indexOf('no_schema') > -1;
-				var canFaq = r.issues.indexOf('no_faq_schema') > -1;
-				var canRepair = r.issues.indexOf('exposed_schema') > -1;
-				var actions = '';
-				if (canRepair) {
-					actions += '<button class="ce-btn ce-btn-sm ce-btn-primary" data-schema-repair="' + r.post_id + '" title="Move o JSON-LD que está aparecendo como texto no conteúdo para o campo de schema e limpa o corpo do post">⚠ Corrigir schema exposto</button> ';
-				}
-				if (canArticle) {
-					actions += '<button class="ce-btn ce-btn-sm" data-fixschema-article="' + r.post_id + '">◈ Inserir Article</button> ';
-				}
-				if (canFaq) {
-					actions += '<button class="ce-btn ce-btn-sm" data-fixschema-faq="' + r.post_id + '">✍ Gerar FAQ + schema</button> ';
-				}
-				if (r.types.length) {
-					actions += '<button class="ce-btn ce-btn-sm ce-btn-ghost" data-schema-remove="' + r.post_id + '" title="Remove o schema gerado pelo Cluster Engine (campo do Rank Math e blocos no conteúdo)">✕ Remover schema</button>';
-				}
-				var check = (canArticle || canFaq || canRepair)
-					? '<input type="checkbox" class="ce-schema-sel" value="' + r.post_id + '" data-article="' + (canArticle ? 1 : 0) + '" data-faq="' + (canFaq ? 1 : 0) + '" data-repair="' + (canRepair ? 1 : 0) + '">'
-					: '';
-				return '<tr id="ce-schema-row-' + r.post_id + '">' +
-					'<td style="width:32px;text-align:center">' + check + '</td>' +
-					'<td><a href="' + esc(r.edit) + '" target="_blank" rel="noopener">' + esc(r.title) + '</a></td>' +
-					'<td>' + types + '</td>' +
-					'<td style="max-width:280px">' + issues + '</td>' +
-					'<td style="white-space:nowrap">' + actions + '</td>' +
-				'</tr>';
-			}).join('');
+			var results = d.results;
+			var withIssues = results.filter(function (r) { return r.issues.length; }).length;
 			var rankmath = /rank\s*math/i.test(CE61.seoPlugin || '');
 			var rmNote = rankmath
 				? '<p class="ce-sub" style="margin:0 0 12px">◈ Rank Math detectado: o schema é gravado no <b>campo de schema do Rank Math</b> (não como texto no conteúdo).</p>'
 				: '<p class="ce-sub" style="margin:0 0 12px">◈ O schema é gravado em um <b>campo personalizado do Cluster Engine</b> e impresso como JSON-LD no &lt;head&gt; da página — nunca como texto dentro do conteúdo.</p>';
 			box.innerHTML =
 				'<div class="ce-card ce-table-wrap">' +
-				'<p style="margin:0 0 12px"><b style="font-family:var(--ce-display)">' + withIssues + '</b> de ' + d.results.length + ' páginas com pendências de schema</p>' +
+				'<p style="margin:0 0 12px"><b style="font-family:var(--ce-display)">' + withIssues + '</b> de ' + results.length + ' páginas com pendências de schema</p>' +
 				rmNote +
 				'<div class="ce-net-toolbar" style="margin-bottom:12px">' +
 					'<label class="ce-check"><input type="checkbox" id="ce-schema-selall"> Selecionar tudo</label>' +
@@ -1089,7 +1132,8 @@
 					'<button class="ce-btn ce-btn-primary ce-btn-sm" id="ce-schema-bulk-go">⧗ Adicionar à fila (<span id="ce-schema-selcount">0</span>)</button>' +
 					'<span class="ce-sub" id="ce-schema-bulk-hint">Marque as páginas e processe as correções em segundo plano pela Fila de Geração</span>' +
 				'</div>' +
-				'<table class="ce-table"><thead><tr><th style="width:32px"></th><th>Página</th><th>Schema encontrado</th><th>Pendências</th><th>Corrigir</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+				'<div style="margin-bottom:12px"><input type="search" class="ce-input" id="ce-schema-search" placeholder="Buscar por título, slug ou URL…" style="max-width:360px"></div>' +
+				'<table class="ce-table"><thead><tr>' + schemaHeadHtml() + '</tr></thead><tbody id="ce-schema-tbody"></tbody></table></div>';
 
 			var goBtn = $('#ce-schema-bulk-go');
 			function schemaSel() { return $$('.ce-schema-sel').filter(function (c) { return c.checked; }); }
@@ -1098,13 +1142,56 @@
 				$('#ce-schema-selcount').textContent = n;
 				goBtn.disabled = !n;
 			}
+			function bindRows() {
+				$$('.ce-schema-sel').forEach(function (c) { c.addEventListener('change', refreshSchemaSel); });
+			}
+			function applyView() {
+				var term = ($('#ce-schema-search') ? $('#ce-schema-search').value.trim().toLowerCase() : '');
+				var list = results.filter(function (r) {
+					if (!term) { return true; }
+					return r.title.toLowerCase().indexOf(term) > -1 ||
+						(r.slug && r.slug.toLowerCase().indexOf(term) > -1) ||
+						(r.url && r.url.toLowerCase().indexOf(term) > -1);
+				});
+				var sorter = schemaSorters[schemaSort.key] || schemaSorters.issues;
+				list = list.slice().sort(function (a, b) {
+					var v = sorter(a, b);
+					return schemaSort.dir === 'asc' ? v : -v;
+				});
+				var tbody = $('#ce-schema-tbody');
+				tbody.innerHTML = list.length
+					? list.map(schemaRowHtml).join('')
+					: '<tr><td colspan="6"><div class="ce-empty" style="padding:20px 0"><p>Nenhuma página corresponde à busca.</p></div></td></tr>';
+				bindRows();
+				var all = $('#ce-schema-selall');
+				if (all) { all.checked = false; }
+				refreshSchemaSel();
+				updateSchemaHeadSort();
+			}
+
 			goBtn.disabled = true;
 			$('#ce-schema-selall').addEventListener('change', function () {
 				var on = this.checked;
 				$$('.ce-schema-sel').forEach(function (c) { c.checked = on; });
 				refreshSchemaSel();
 			});
-			$$('.ce-schema-sel').forEach(function (c) { c.addEventListener('change', refreshSchemaSel); });
+			$('#ce-schema-search').addEventListener('input', applyView);
+			$$('#ce-schema-results .ce-th-sort').forEach(function (th) {
+				var handler = function () {
+					var c = schemaHeadCols[+th.dataset.schemacol];
+					if (schemaSort.key === c.key) {
+						schemaSort.dir = schemaSort.dir === 'asc' ? 'desc' : 'asc';
+					} else {
+						schemaSort.key = c.key;
+						schemaSort.dir = c.def;
+					}
+					applyView();
+				};
+				th.addEventListener('click', handler);
+				th.addEventListener('keydown', function (e) {
+					if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); }
+				});
+			});
 			goBtn.addEventListener('click', function () {
 				var mode = $('#ce-schema-bulk-mode').value;
 				var attr = mode; // 'article' | 'faq' | 'repair' — casa com data-<attr> das checkboxes.
@@ -1122,6 +1209,8 @@
 					gotoTab('queue');
 				}).catch(function (e) { goBtn.disabled = false; toast(e.message, true); });
 			});
+
+			applyView();
 		}).catch(function (e) { box.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
 	}
 

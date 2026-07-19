@@ -248,12 +248,15 @@ class CE61_Schema {
 			if ( ! is_array( $audit ) ) {
 				continue;
 			}
+			$pid   = (int) $r['post_id'];
 			$out[] = array(
-				'post_id' => (int) $r['post_id'],
+				'post_id' => $pid,
 				'title'   => $r['title'],
+				'slug'    => get_post_field( 'post_name', $pid ),
+				'url'     => get_permalink( $pid ),
 				'types'   => isset( $audit['types'] ) ? $audit['types'] : array(),
 				'issues'  => isset( $audit['issues'] ) ? $audit['issues'] : array(),
-				'edit'    => get_edit_post_link( (int) $r['post_id'], 'raw' ),
+				'edit'    => get_edit_post_link( $pid, 'raw' ),
 			);
 		}
 		return $out;
