@@ -96,7 +96,8 @@
 
 	var tabPage = {
 		dashboard: 'main', clusters: 'main', links: 'main', keywords: 'main',
-		diagnostics: 'main', schema: 'main', images: 'main',
+		diagnostics: 'main', schema: 'main',
+		images_articles: 'images', images_convert: 'images', images_presets: 'images', images_settings: 'images', images_errors: 'images',
 		creator: 'creator', queue: 'creator',
 		settings: 'settings', ai: 'settings', integrations: 'settings',
 		performance: 'performance', network: 'network'
@@ -187,7 +188,11 @@
 			keywords: renderKeywords,
 			diagnostics: renderDiagnostics,
 			schema: renderSchema,
-			images: renderImages,
+			images_articles: renderImagesArticles,
+			images_convert: renderImagesConvert,
+			images_presets: renderImagesPresets,
+			images_settings: renderImagesSettings,
+			images_errors: renderImagesErrors,
 			ai: renderAI,
 			settings: renderSettings,
 			integrations: renderIntegrations,
@@ -749,7 +754,7 @@
 
 	/* ---------- Global delegated clicks: works for any dynamically rendered button ---------- */
 	document.addEventListener('click', function (e) {
-		var t = e.target.closest ? e.target.closest('[data-ai],[data-anchor],[data-dismiss],[data-open],[data-pillar],[data-merge],[data-goto],[data-fixschema-article],[data-fixschema-faq],[data-schema-remove],[data-schema-repair],[data-fixheadings],[data-imggen],[data-imgview]') : null;
+		var t = e.target.closest ? e.target.closest('[data-ai],[data-anchor],[data-dismiss],[data-open],[data-pillar],[data-merge],[data-goto],[data-fixschema-article],[data-fixschema-faq],[data-schema-remove],[data-schema-repair],[data-fixheadings],[data-imggen],[data-imgcontent],[data-imgview]') : null;
 		if (!t || t.disabled) { return; }
 		if (t.dataset.goto) {
 			var parts = t.dataset.goto.split('#');
@@ -759,6 +764,7 @@
 		}
 		if (t.dataset.fixheadings) { runHeadingsFix(t); return; }
 		if (t.dataset.imggen) { runImageGen(t); return; }
+		if (t.dataset.imgcontent) { runImageInline(t); return; }
 		if (t.dataset.imgview) {
 			modal('<img src="' + esc(t.dataset.imgview) + '" alt="" style="max-width:100%;border-radius:12px;display:block">');
 			return;
@@ -1322,8 +1328,8 @@
 	}
 
 	/* ---------- Featured images ---------- */
-	function renderImages() {
-		var el = $('#ce-panel-images');
+	function renderImagesArticles() {
+		var el = $('#ce-panel-images_articles');
 		el.innerHTML = '<div class="ce-loading">Carregando imagens destacadas</div>';
 		api('images_list', {}).then(function (d) {
 			if (!d.posts.length) {
@@ -1342,7 +1348,8 @@
 					media +
 					'<div class="ce-imgcard-body">' +
 						'<p class="ce-imgcard-title"><a href="' + esc(p.edit) + '" target="_blank" rel="noopener">' + esc(p.title) + '</a></p>' +
-						'<button class="ce-btn ce-btn-sm" data-imggen="' + p.post_id + '" data-title="' + esc(p.title) + '">' + (p.thumb ? '✦ Recriar imagem' : '✦ Gerar imagem') + '</button>' +
+						'<button class="ce-btn ce-btn-sm" data-imggen="' + p.post_id + '" data-title="' + esc(p.title) + '">' + (p.thumb ? '✦ Recriar destacada' : '✦ Gerar destacada') + '</button> ' +
+						'<button class="ce-btn ce-btn-sm ce-btn-ghost" data-imgcontent="' + p.post_id + '" data-title="' + esc(p.title) + '">🖼 No conteúdo</button>' +
 					'</div></div>';
 			}
 			el.innerHTML =
@@ -1585,6 +1592,414 @@
 			showAi();
 		});
 		if ('ai' === defaultSource) { showAi(); } else { showStock(); }
+	}
+
+	/* ---------- Imagens dentro do post (in-content) ---------- */
+	function uploadReference(file) {
+		var body = new FormData();
+		body.append('action', 'ce61_image_reference_upload');
+		body.append('nonce', CE61.nonce);
+		body.append('file', file);
+		return fetch(CE61.ajax, { method: 'POST', credentials: 'same-origin', body: body })
+			.then(function (r) { return r.json(); })
+			.then(function (j) { if (!j || !j.success) { throw new Error(j && j.data && j.data.message ? j.data.message : 'Falha no upload.'); } return j.data; });
+	}
+
+	function runImageInline(btn) {
+		var pid = btn.dataset.imgcontent;
+		var title = btn.dataset.title;
+		if (!requireImageKey()) { return; }
+		var provider = CE61.settings.image_provider || 'openai';
+		var models = CE61.imageCatalog[provider] || {};
+		var defaultModel = CE61.settings.image_model && models[CE61.settings.image_model] ? CE61.settings.image_model : Object.keys(models)[0];
+		var refId = 0;
+		var presets = CE61.imagePresets || [];
+
+		var html =
+			'<h3 class="ce-h2">Imagem no conteúdo — ' + esc(title) + '</h3>' +
+			'<p class="ce-sub">Gera imagem(ns) otimizada(s) em WebP com SEO completo e insere no corpo do post na posição escolhida. Você pode usar uma imagem de referência, um prompt próprio e salvar tudo como preset.</p>' +
+			(presets.length ? '<div class="ce-field"><label>Aplicar preset</label><select class="ce-select" id="ce-il-preset"><option value="">— nenhum —</option>' + presets.map(function (p) { return '<option value="' + esc(p.id) + '">' + esc(p.label) + '</option>'; }).join('') + '</select></div>' : '') +
+			'<div class="ce-grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
+				'<div class="ce-field" style="margin:0"><label>Posição no artigo</label><select class="ce-select" id="ce-il-position">' +
+					'<option value="start">No início</option>' +
+					'<option value="after_h2" selected>Após o 1º subtítulo (H2)</option>' +
+					'<option value="end">No final</option>' +
+				'</select></div>' +
+				'<div class="ce-field" style="margin:0"><label>Quantidade</label><select class="ce-select" id="ce-il-qty"><option>1</option><option>2</option><option>3</option></select></div>' +
+			'</div>' +
+			'<div class="ce-grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
+				'<div class="ce-field" style="margin:0"><label>Modelo</label><select class="ce-select" id="ce-il-model">' +
+					Object.keys(models).map(function (k) { return '<option value="' + k + '"' + (k === defaultModel ? ' selected' : '') + '>' + esc(models[k].label) + '</option>'; }).join('') +
+				'</select></div>' +
+				'<div class="ce-field" style="margin:0"><label>Proporção</label><select class="ce-select" id="ce-il-aspect">' +
+					Object.keys(CE61.imageAspectRatios).map(function (k) { return '<option value="' + k + '"' + (k === CE61.settings.image_aspect ? ' selected' : '') + '>' + esc(CE61.imageAspectRatios[k].label) + '</option>'; }).join('') +
+				'</select></div>' +
+			'</div>' +
+			'<div class="ce-field"><label>Estilo</label><div class="ce-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:2px 12px">' +
+				Object.keys(CE61.imageStylePresets).map(function (k) {
+					var checked = CE61.settings.image_style_presets.indexOf(k) > -1 ? ' checked' : '';
+					return '<label class="ce-check"><input type="checkbox" class="ce-il-preset" value="' + k + '"' + checked + '> ' + esc(CE61.imageStylePresets[k].label) + '</label>';
+				}).join('') +
+			'</div></div>' +
+			'<div class="ce-field"><label>Imagem de referência (opcional)</label>' +
+				'<div id="ce-il-refzone" style="border:1px dashed var(--ce-line);border-radius:10px;padding:12px;text-align:center">' +
+					'<div id="ce-il-refpreview"></div>' +
+					'<p style="margin:6px 0"><button class="ce-btn ce-btn-sm" type="button" id="ce-il-reflib">🖼 Biblioteca</button> ' +
+					'<button class="ce-btn ce-btn-sm" type="button" id="ce-il-reffile">📁 Enviar arquivo</button></p>' +
+					'<p class="ce-hint" style="margin:0">ou arraste uma imagem aqui</p>' +
+					'<input type="file" id="ce-il-refinput" accept="image/*" hidden>' +
+				'</div>' +
+			'</div>' +
+			'<div class="ce-field"><label>Prompt de otimização (opcional)</label><textarea class="ce-textarea" id="ce-il-prompt" style="min-height:110px" placeholder="Vazio = usa o prompt mestre das Configurações com os dados do post"></textarea></div>' +
+			'<div class="ce-field"><label class="ce-check"><input type="checkbox" id="ce-il-savepreset"> Salvar como preset (modelo editorial)</label>' +
+				'<input class="ce-input" id="ce-il-presetlabel" placeholder="Nome do preset" style="margin-top:6px" hidden></div>' +
+			'<p><button class="ce-btn ce-btn-primary" id="ce-il-go">✦ Gerar e inserir</button></p>' +
+			'<div id="ce-il-out"></div>';
+
+		modal(html);
+
+		function setRef(id, url) {
+			refId = id || 0;
+			var prev = $('#ce-il-refpreview');
+			prev.innerHTML = refId
+				? '<img src="' + esc(url) + '" alt="" style="max-height:90px;border-radius:8px;border:1px solid var(--ce-line)"><br><button class="ce-btn ce-btn-sm ce-btn-ghost" type="button" id="ce-il-refclear">✕ Remover referência</button>'
+				: '';
+			if (refId) {
+				$('#ce-il-refclear').addEventListener('click', function () { setRef(0, ''); });
+			}
+		}
+
+		$('#ce-il-reflib').addEventListener('click', function (e) {
+			e.preventDefault();
+			if (!window.wp || !wp.media) { toast('Biblioteca de mídia indisponível', true); return; }
+			var frame = wp.media({ title: 'Escolher imagem de referência', multiple: false, library: { type: 'image' } });
+			frame.on('select', function () {
+				var att = frame.state().get('selection').first().toJSON();
+				setRef(att.id, att.sizes && att.sizes.medium ? att.sizes.medium.url : att.url);
+			});
+			frame.open();
+		});
+		$('#ce-il-reffile').addEventListener('click', function () { $('#ce-il-refinput').click(); });
+		$('#ce-il-refinput').addEventListener('change', function () {
+			if (!this.files || !this.files[0]) { return; }
+			$('#ce-il-refpreview').innerHTML = '<span class="ce-sub">Enviando…</span>';
+			uploadReference(this.files[0]).then(function (r) { setRef(r.attachment_id, r.url); }).catch(function (e) { toast(e.message, true); setRef(0, ''); });
+		});
+		var zone = $('#ce-il-refzone');
+		['dragenter', 'dragover'].forEach(function (ev) { zone.addEventListener(ev, function (e) { e.preventDefault(); zone.style.background = 'var(--ce-surface-2, rgba(0,0,0,.03))'; }); });
+		['dragleave', 'drop'].forEach(function (ev) { zone.addEventListener(ev, function (e) { e.preventDefault(); zone.style.background = ''; }); });
+		zone.addEventListener('drop', function (e) {
+			var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+			if (!f) { return; }
+			$('#ce-il-refpreview').innerHTML = '<span class="ce-sub">Enviando…</span>';
+			uploadReference(f).then(function (r) { setRef(r.attachment_id, r.url); }).catch(function (er) { toast(er.message, true); setRef(0, ''); });
+		});
+
+		$('#ce-il-savepreset').addEventListener('change', function () { $('#ce-il-presetlabel').hidden = !this.checked; });
+
+		if (presets.length) {
+			$('#ce-il-preset').addEventListener('change', function () {
+				var p = presets.filter(function (x) { return x.id === this.value; }, this)[0];
+				if (!p) { return; }
+				if (p.model && models[p.model]) { $('#ce-il-model').value = p.model; }
+				if (p.aspect) { $('#ce-il-aspect').value = p.aspect; }
+				$('#ce-il-prompt').value = p.prompt || '';
+				$$('.ce-il-preset').forEach(function (c) { c.checked = (p.style_presets || []).indexOf(c.value) > -1; });
+				if (p.reference_id) { api('image_presets', {}); setRef(0, ''); }
+			});
+		}
+
+		$('#ce-il-go').addEventListener('click', function () {
+			var out = $('#ce-il-out');
+			var go = $('#ce-il-go');
+			go.disabled = true;
+			var ctrl = new AbortController();
+			_activeController = ctrl;
+			out.innerHTML = '<div class="ce-loading">Gerando e inserindo, pode levar alguns minutos…</div>' +
+				'<p style="margin-top:8px"><button class="ce-btn ce-btn-sm ce-btn-ghost" id="ce-il-cancel">✕ Cancelar</button></p>';
+			$('#ce-il-cancel').addEventListener('click', function () { ctrl.abort(); });
+			var stylePresets = $$('.ce-il-preset:checked').map(function (c) { return c.value; });
+			var payload = {
+				post_id: pid,
+				position: $('#ce-il-position').value,
+				quantity: $('#ce-il-qty').value,
+				model: $('#ce-il-model').value,
+				aspect: $('#ce-il-aspect').value,
+				style_presets: JSON.stringify(stylePresets),
+				prompt: $('#ce-il-prompt').value,
+				reference_id: refId
+			};
+			if ($('#ce-il-savepreset').checked) {
+				payload.save_preset = 1;
+				payload.preset_label = $('#ce-il-presetlabel').value;
+			}
+			api('image_generate_inline', payload, { signal: ctrl.signal, timeout: 180000 }).then(function (r) {
+				if (_activeController !== ctrl || !$('#ce-il-out')) { return; }
+				_activeController = null;
+				out.innerHTML = '<p><span class="ce-chip ce-chip-green">' + r.count + ' imagem(ns) inserida(s) no conteúdo</span></p>' +
+					(r.inserted || []).map(function (i) { return '<img src="' + esc(i.url) + '" alt="" style="max-width:48%;border-radius:10px;border:1px solid var(--ce-line);margin:4px">'; }).join('') +
+					'<p style="margin-top:10px"><a class="ce-btn ce-btn-sm" href="' + esc(r.edit) + '" target="_blank" rel="noopener">Abrir editor</a></p>';
+				toast('Imagens inseridas no conteúdo');
+				if (payload.save_preset) { api('image_presets', {}).then(function (d) { CE61.imagePresets = d.presets; }); }
+			}).catch(function (e) {
+				if (_activeController !== ctrl) { return; }
+				_activeController = null;
+				var goBtn = $('#ce-il-go');
+				if (goBtn) { goBtn.disabled = false; }
+				var o = $('#ce-il-out');
+				if (o) { o.innerHTML = '<p>' + esc(e.message) + '</p>'; }
+			});
+		});
+	}
+
+	/* ---------- Imagens: converter para WebP ---------- */
+	function renderImagesConvert() {
+		var el = $('#ce-panel-images_convert');
+		el.innerHTML = '<div class="ce-loading">Carregando imagens dos artigos</div>';
+		api('images_convert_list', {}).then(function (d) {
+			var imgs = d.images || [];
+			if (!imgs.length) { el.innerHTML = '<div class="ce-empty"><h3>Nenhuma imagem encontrada</h3><p>Rode o scan para indexar os posts.</p></div>'; return; }
+			var pending = imgs.filter(function (i) { return !i.is_webp && !i.converted; });
+			function fmtKB(b) { return b ? Math.round(b / 1024).toLocaleString('pt-BR') + ' KB' : '—'; }
+			function statusChip(i) {
+				return i.is_webp ? '<span class="ce-chip ce-chip-green">WebP</span>'
+					: (i.converted ? '<span class="ce-chip ce-chip-green">convertida</span>' : '<span class="ce-chip ce-chip-red">' + esc(i.mime || '') + '</span>');
+			}
+			function row(i) {
+				var done = i.is_webp || i.converted;
+				return '<tr id="ce-cv-' + i.attachment_id + '">' +
+					'<td style="width:24px">' + (done ? '' : '<input type="checkbox" class="ce-cv-sel" value="' + i.attachment_id + '">') + '</td>' +
+					'<td>' + (i.thumb ? '<img src="' + esc(i.thumb) + '" alt="" style="width:44px;height:44px;object-fit:cover;border-radius:6px;vertical-align:middle">' : '') + '</td>' +
+					'<td>' + (i.edit ? '<a href="' + esc(i.edit) + '" target="_blank" rel="noopener">' + esc(i.post_title || '(sem título)') + '</a>' : esc(i.post_title || '')) + '<br><span class="ce-sub">' + esc(i.filename || '') + '</span></td>' +
+					'<td class="ce-sub">' + fmtKB(i.bytes) + '</td>' +
+					'<td class="ce-cv-status">' + statusChip(i) + '</td>' +
+					'<td style="text-align:right" class="ce-cv-act">' + (done ? '' : '<button class="ce-btn ce-btn-sm" data-cvone="' + i.attachment_id + '">Converter</button>') + '</td>' +
+				'</tr>';
+			}
+			el.innerHTML =
+				'<div class="ce-section"><h2 class="ce-h2">Converter imagens para WebP</h2>' +
+				'<p class="ce-sub">Converte as imagens dos artigos (destacadas e anexos) para WebP otimizado, mantendo sempre o arquivo original — a operação é reversível. As referências (imagem destacada e URLs no corpo) passam a apontar para a nova versão.</p>' +
+				'<div class="ce-net-toolbar">' +
+					'<label class="ce-check"><input type="checkbox" id="ce-cv-all"> Selecionar pendentes</label>' +
+					'<button class="ce-btn ce-btn-primary" id="ce-cv-bulk">Converter em fila (<span id="ce-cv-count">0</span>)</button>' +
+					'<span class="ce-sub">' + pending.length + ' imagem(ns) pendente(s)</span>' +
+				'</div>' +
+				'<table class="ce-table"><thead><tr><th></th><th></th><th>Post / arquivo</th><th>Tamanho</th><th>Status</th><th></th></tr></thead><tbody>' +
+					imgs.map(row).join('') +
+				'</tbody></table></div>';
+
+			function updateCount() {
+				var n = $$('.ce-cv-sel:checked', el).length;
+				$('#ce-cv-count').textContent = n;
+				$('#ce-cv-bulk').disabled = !n;
+			}
+			$('#ce-cv-bulk').disabled = true;
+			$$('.ce-cv-sel', el).forEach(function (c) { c.addEventListener('change', updateCount); });
+			$('#ce-cv-all').addEventListener('change', function () {
+				var checked = this.checked;
+				$$('.ce-cv-sel', el).forEach(function (c) { c.checked = checked; });
+				updateCount();
+			});
+			$('#ce-cv-bulk').addEventListener('click', function () {
+				var ids = $$('.ce-cv-sel:checked', el).map(function (c) { return parseInt(c.value, 10); });
+				if (!ids.length) { return; }
+				var b = $('#ce-cv-bulk');
+				b.disabled = true;
+				api('images_convert_queue_add', { attachment_ids: JSON.stringify(ids) }).then(function (r) {
+					toast(r.added + ' conversão(ões) na fila');
+					gotoTab('queue');
+				}).catch(function (e) { b.disabled = false; toast(e.message, true); });
+			});
+			el.addEventListener('click', function (e) {
+				var b = e.target.closest ? e.target.closest('[data-cvone]') : null;
+				if (!b || b.disabled) { return; }
+				var aid = b.dataset.cvone;
+				b.disabled = true; b.textContent = 'Convertendo…';
+				api('image_convert', { attachment_id: aid }, { timeout: 120000 }).then(function (r) {
+					var tr = $('#ce-cv-' + aid);
+					if (tr) {
+						tr.querySelector('.ce-cv-status').innerHTML = '<span class="ce-chip ce-chip-green">convertida</span>';
+						tr.querySelector('.ce-cv-act').innerHTML = '';
+						var sel = tr.querySelector('.ce-cv-sel');
+						if (sel) { sel.remove(); }
+					}
+					toast('Convertida (' + Math.round((r.saved_bytes || 0) / 1024) + ' KB economizados)');
+				}).catch(function (er) { b.disabled = false; b.textContent = 'Converter'; toast(er.message, true); });
+			});
+		}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
+	}
+
+	/* ---------- Imagens: presets ---------- */
+	function renderImagesPresets() {
+		var el = $('#ce-panel-images_presets');
+		function draw(list) {
+			CE61.imagePresets = list || [];
+			var cards = (list || []).map(function (p) {
+				var styles = (p.style_presets || []).map(function (k) { return CE61.imageStylePresets[k] ? CE61.imageStylePresets[k].label : k; }).join(', ');
+				return '<div class="ce-card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">' +
+					'<div><h3 style="margin:0 0 4px">' + esc(p.label) + '</h3>' +
+					'<p class="ce-sub" style="margin:0">' + (p.model ? esc(p.model) + ' · ' : '') + (p.aspect ? esc(p.aspect) : '') + (styles ? ' · ' + esc(styles) : '') + '</p>' +
+					(p.prompt ? '<p class="ce-sub" style="margin:6px 0 0;white-space:pre-wrap">' + esc(p.prompt.slice(0, 200)) + (p.prompt.length > 200 ? '…' : '') + '</p>' : '') + '</div>' +
+					'<button class="ce-btn ce-btn-sm ce-btn-ghost" data-presetdel="' + esc(p.id) + '" title="Remover preset">✕</button>' +
+					'</div></div>';
+			}).join('');
+			el.innerHTML =
+				'<div class="ce-section"><h2 class="ce-h2">Presets de imagem</h2>' +
+				'<p class="ce-sub">Modelos reutilizáveis que mantêm a mesma linha editorial. São alimentados automaticamente quando você marca "Salvar como preset" ao gerar uma imagem no conteúdo, e ficam disponíveis no seletor de geração.</p></div>' +
+				(cards || '<div class="ce-empty"><p>Nenhum preset ainda. Gere uma imagem no conteúdo marcando "Salvar como preset".</p></div>');
+			$$('[data-presetdel]', el).forEach(function (b) {
+				b.addEventListener('click', function () {
+					if (!window.confirm('Remover este preset?')) { return; }
+					api('image_preset_delete', { id: b.dataset.presetdel }).then(function (r) { draw(r.presets); toast('Preset removido'); }).catch(function (e) { toast(e.message, true); });
+				});
+			});
+		}
+		el.innerHTML = '<div class="ce-loading">Carregando presets</div>';
+		api('image_presets', {}).then(function (d) { draw(d.presets); }).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
+	}
+
+	/* ---------- Imagens: erros ---------- */
+	function renderImagesErrors() {
+		var el = $('#ce-panel-images_errors');
+		el.innerHTML = '<div class="ce-loading">Carregando erros</div>';
+		api('image_errors', {}).then(function (d) {
+			var all = (d.manual || []).concat(d.queue || []);
+			if (!all.length) { el.innerHTML = '<div class="ce-empty"><h3>Sem erros</h3><p>Nenhuma falha de geração ou conversão de imagem registrada.</p></div>'; return; }
+			function row(e) {
+				return '<tr><td class="ce-sub" style="white-space:nowrap">' + esc(e.time || '') + '</td>' +
+					'<td>' + esc(e.title || '') + '</td>' +
+					'<td>' + esc(e.message || '') + '</td></tr>';
+			}
+			el.innerHTML =
+				'<div class="ce-section"><h2 class="ce-h2">Erros de imagem</h2>' +
+				'<p class="ce-sub">Falhas recentes de geração (destacada / no conteúdo) e conversão WebP, incluindo os jobs processados pela Fila.</p>' +
+				'<table class="ce-table"><thead><tr><th>Quando</th><th>Post</th><th>Mensagem</th></tr></thead><tbody>' + all.map(row).join('') + '</tbody></table></div>';
+		}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
+	}
+
+	/* ---------- Imagens: configurações (movidas das Configurações gerais) ---------- */
+	function renderImagesSettings() {
+		var el = $('#ce-panel-images_settings');
+		var s = CE61.settings;
+		el.innerHTML =
+			'<div class="ce-card">' +
+				'<h2 class="ce-h2">Geração & otimização de imagens</h2>' +
+				'<p class="ce-sub">Configura como o plugin gera (destacada e no conteúdo) e otimiza as imagens. A Anthropic não gera imagens; escolha OpenAI ou Google. As chaves de API ficam em Configurações → Provedor de IA.</p>' +
+				'<div class="ce-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">' +
+					'<div class="ce-field"><label>Provedor de imagem</label><select class="ce-select" id="ce-is-provider">' +
+						'<option value="openai"' + (s.image_provider === 'openai' ? ' selected' : '') + '>OpenAI (GPT Image)</option>' +
+						'<option value="gemini"' + (s.image_provider === 'gemini' ? ' selected' : '') + '>Google (Imagen / Gemini)</option>' +
+					'</select></div>' +
+					'<div class="ce-field"><label>Modelo</label><select class="ce-select" id="ce-is-model"></select><p class="ce-hint" id="ce-is-model-note"></p></div>' +
+					'<div class="ce-field"><label>Proporção padrão</label><select class="ce-select" id="ce-is-aspect">' +
+						Object.keys(CE61.imageAspectRatios).map(function (k) { return '<option value="' + k + '"' + (s.image_aspect === k ? ' selected' : '') + '>' + esc(CE61.imageAspectRatios[k].label) + '</option>'; }).join('') +
+					'</select></div>' +
+					'<div class="ce-field"><label>Cores da marca</label><input class="ce-input" id="ce-is-colors" value="' + esc(s.image_colors) + '" placeholder="ex.: azul #2547F4, branco e dourado"></div>' +
+				'</div>' +
+				'<div class="ce-field"><label>Estilos padrão (marcados entram sempre no prompt)</label><div class="ce-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:4px 14px">' +
+					Object.keys(CE61.imageStylePresets).map(function (k) {
+						var checked = s.image_style_presets.indexOf(k) > -1 ? ' checked' : '';
+						return '<label class="ce-check"><input type="checkbox" class="ce-is-preset" value="' + k + '"' + checked + '> ' + esc(CE61.imageStylePresets[k].label) + '</label>';
+					}).join('') +
+				'</div></div>' +
+				'<div class="ce-field"><label>Notas de estilo (livre)</label><textarea class="ce-textarea" id="ce-is-style" style="min-height:60px" placeholder="ex.: público de clínicas médicas; visual clean e confiável">' + esc(s.image_style) + '</textarea></div>' +
+				'<div class="ce-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">' +
+					'<div class="ce-field"><label class="ce-check"><input type="checkbox" id="ce-is-webp"' + (s.image_webp ? ' checked' : '') + '> Converter para WebP ao salvar</label><p class="ce-hint">Aplica-se a imagens geradas e enviadas pelo plugin, mantendo o SEO.</p></div>' +
+					'<div class="ce-field"><label>Qualidade WebP (40–100)</label><input class="ce-input" type="number" id="ce-is-webpq" min="40" max="100" value="' + (s.image_webp_quality || 82) + '"></div>' +
+				'</div>' +
+				'<div class="ce-field"><label>Watermark</label>' +
+					'<div style="display:flex;gap:16px;margin-bottom:8px">' +
+						'<label class="ce-check"><input type="radio" name="ce-is-wm-type" value="text"' + (s.image_watermark_type !== 'image' ? ' checked' : '') + '> Texto</label>' +
+						'<label class="ce-check"><input type="radio" name="ce-is-wm-type" value="image"' + (s.image_watermark_type === 'image' ? ' checked' : '') + '> Imagem/logo</label>' +
+					'</div>' +
+					'<div id="ce-is-wm-text-wrap"' + (s.image_watermark_type === 'image' ? ' hidden' : '') + '>' +
+						'<input class="ce-input" id="ce-is-watermark" value="' + esc(s.image_watermark) + '" placeholder="ex.: seusite.com.br">' +
+						'<p class="ce-hint">Aplicado como texto no canto inferior direito.</p>' +
+					'</div>' +
+					'<div id="ce-is-wm-image-wrap"' + (s.image_watermark_type !== 'image' ? ' hidden' : '') + '>' +
+						'<p style="margin:0 0 8px"><button class="ce-btn ce-btn-sm" id="ce-is-wm-pick" type="button">🖼 Escolher da Biblioteca de Mídia</button> ' +
+						(s.image_watermark_media_url ? '<img src="' + esc(s.image_watermark_media_url) + '" alt="" style="height:36px;vertical-align:middle;margin-left:8px;border-radius:4px;border:1px solid var(--ce-line)" id="ce-is-wm-preview">' : '<img id="ce-is-wm-preview" alt="" style="height:36px;vertical-align:middle;margin-left:8px;border-radius:4px;display:none">') +
+						'</p>' +
+						'<input type="hidden" id="ce-is-wm-media-id" value="' + (s.image_watermark_media_id || '') + '">' +
+						'<input class="ce-input" id="ce-is-watermark-url" value="' + esc(s.image_watermark_url) + '" placeholder="ou cole a URL de uma imagem (PNG transparente funciona melhor)">' +
+						'<p class="ce-hint">Sobreposto no canto inferior direito. A Biblioteca de Mídia tem prioridade sobre a URL.</p>' +
+					'</div>' +
+				'</div>' +
+				'<div class="ce-field"><label>Prompt mestre de imagem</label>' +
+					'<textarea class="ce-textarea" id="ce-is-prompt-master" style="min-height:150px">' + esc(s.image_prompt) + '</textarea>' +
+					'<p class="ce-hint">Variáveis: {{title}}, {{keyword}}, {{site_name}}, {{cluster_name}}, {{colors}}, {{style_notes}}. Estilos e proporção marcados acima são adicionados automaticamente.</p></div>' +
+				'<p><button class="ce-btn ce-btn-primary" id="ce-is-save">Salvar configurações de imagem</button></p>' +
+			'</div>';
+
+		function renderModelOptions() {
+			var provider = $('#ce-is-provider').value;
+			var mods = CE61.imageCatalog[provider] || {};
+			var sel = $('#ce-is-model');
+			var current = s.image_model && mods[s.image_model] ? s.image_model : Object.keys(mods)[0];
+			sel.innerHTML = Object.keys(mods).map(function (k) { return '<option value="' + k + '"' + (k === current ? ' selected' : '') + '>' + esc(mods[k].label) + '</option>'; }).join('');
+			var note = $('#ce-is-model-note');
+			if (note && mods[current]) { note.textContent = mods[current].note || ''; }
+			sel.onchange = function () { var m = mods[this.value]; if (note) { note.textContent = m ? (m.note || '') : ''; } };
+		}
+		renderModelOptions();
+		$('#ce-is-provider').addEventListener('change', renderModelOptions);
+
+		$$('input[name="ce-is-wm-type"]', el).forEach(function (r) {
+			r.addEventListener('change', function () {
+				$('#ce-is-wm-text-wrap').hidden = (this.value !== 'text');
+				$('#ce-is-wm-image-wrap').hidden = (this.value !== 'image');
+			});
+		});
+		var pick = $('#ce-is-wm-pick');
+		if (pick) {
+			pick.addEventListener('click', function (e) {
+				e.preventDefault();
+				if (!window.wp || !wp.media) { toast('Biblioteca de mídia indisponível', true); return; }
+				var frame = wp.media({ title: 'Escolher imagem de watermark', multiple: false, library: { type: 'image' } });
+				frame.on('select', function () {
+					var att = frame.state().get('selection').first().toJSON();
+					$('#ce-is-wm-media-id').value = att.id;
+					var prev = $('#ce-is-wm-preview');
+					prev.src = att.sizes && att.sizes.thumbnail ? att.sizes.thumbnail.url : att.url;
+					prev.style.display = 'inline-block';
+				});
+				frame.open();
+			});
+		}
+
+		$('#ce-is-save').addEventListener('click', function () {
+			var settings = {
+				image_provider: $('#ce-is-provider').value,
+				image_model: $('#ce-is-model').value,
+				image_aspect: $('#ce-is-aspect').value,
+				image_style_presets: $$('.ce-is-preset:checked', el).map(function (c) { return c.value; }),
+				image_colors: $('#ce-is-colors').value,
+				image_style: $('#ce-is-style').value,
+				image_prompt: $('#ce-is-prompt-master').value,
+				image_webp: $('#ce-is-webp').checked ? 1 : 0,
+				image_webp_quality: $('#ce-is-webpq').value,
+				image_watermark_type: $('input[name="ce-is-wm-type"]:checked', el) ? $('input[name="ce-is-wm-type"]:checked', el).value : 'text',
+				image_watermark: $('#ce-is-watermark').value,
+				image_watermark_url: $('#ce-is-watermark-url').value,
+				image_watermark_media_id: $('#ce-is-wm-media-id').value || 0
+			};
+			api('save_settings', { settings: settings }).then(function () {
+				toast('Configurações de imagem salvas');
+				CE61.settings.image_provider = settings.image_provider;
+				CE61.settings.image_model = settings.image_model;
+				CE61.settings.image_aspect = settings.image_aspect;
+				CE61.settings.image_style_presets = settings.image_style_presets;
+				CE61.settings.image_colors = settings.image_colors;
+				CE61.settings.image_style = settings.image_style;
+				CE61.settings.image_prompt = settings.image_prompt;
+				CE61.settings.image_webp = !!$('#ce-is-webp').checked;
+				CE61.settings.image_webp_quality = parseInt(settings.image_webp_quality, 10) || 82;
+				CE61.settings.image_watermark_type = settings.image_watermark_type;
+				CE61.settings.image_watermark = settings.image_watermark;
+				CE61.settings.image_watermark_url = settings.image_watermark_url;
+				CE61.settings.image_watermark_media_id = settings.image_watermark_media_id;
+			}).catch(function (e) { toast(e.message, true); });
+		});
 	}
 
 	/* ---------- AI & Prompts ---------- */
@@ -2378,94 +2793,12 @@
 			'</div>' +
 			'</div>' +
 			'<div class="ce-card" style="grid-column:1/-1">' +
-				'<h2 class="ce-h2">Geração de imagens destacadas</h2>' +
-				'<p class="ce-sub">Usado pela aba Imagens quando a fonte é IA. A Anthropic não gera imagens; escolha OpenAI ou Google.</p>' +
-				'<div class="ce-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">' +
-					'<div class="ce-field"><label>Provedor de imagem</label><select class="ce-select" id="ce-img-provider">' +
-						'<option value="openai"' + (s.image_provider === 'openai' ? ' selected' : '') + '>OpenAI (GPT Image)</option>' +
-						'<option value="gemini"' + (s.image_provider === 'gemini' ? ' selected' : '') + '>Google (Imagen / Gemini)</option>' +
-					'</select></div>' +
-					'<div class="ce-field"><label>Modelo</label><select class="ce-select" id="ce-img-model"></select>' +
-					'<p class="ce-hint" id="ce-img-model-note"></p></div>' +
-					'<div class="ce-field"><label>Proporção padrão</label><select class="ce-select" id="ce-img-aspect">' +
-						Object.keys(CE61.imageAspectRatios).map(function (k) {
-							return '<option value="' + k + '"' + (s.image_aspect === k ? ' selected' : '') + '>' + esc(CE61.imageAspectRatios[k].label) + '</option>';
-						}).join('') +
-					'</select></div>' +
-					'<div class="ce-field"><label>Cores da marca</label><input class="ce-input" id="ce-img-colors" value="' + esc(s.image_colors) + '" placeholder="ex.: azul #2547F4, branco e dourado"></div>' +
-				'</div>' +
-				'<div class="ce-field"><label>Estilos padrão (marcados entram sempre no prompt)</label><div class="ce-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:4px 14px">' +
-					Object.keys(CE61.imageStylePresets).map(function (k) {
-						var checked = s.image_style_presets.indexOf(k) > -1 ? ' checked' : '';
-						return '<label class="ce-check"><input type="checkbox" class="ce-img-preset" value="' + k + '"' + checked + '> ' + esc(CE61.imageStylePresets[k].label) + '</label>';
-					}).join('') +
-				'</div></div>' +
-				'<div class="ce-field"><label>Notas de estilo (livre)</label><textarea class="ce-textarea" id="ce-img-style" style="min-height:60px" placeholder="ex.: público de clínicas médicas; visual clean e confiável; evitar clichês de estetoscópio">' + esc(s.image_style) + '</textarea></div>' +
-
-				'<div class="ce-field"><label>Watermark</label>' +
-					'<div style="display:flex;gap:16px;margin-bottom:8px">' +
-						'<label class="ce-check"><input type="radio" name="ce-wm-type" value="text"' + (s.image_watermark_type !== 'image' ? ' checked' : '') + '> Texto</label>' +
-						'<label class="ce-check"><input type="radio" name="ce-wm-type" value="image"' + (s.image_watermark_type === 'image' ? ' checked' : '') + '> Imagem/logo</label>' +
-					'</div>' +
-					'<div id="ce-wm-text-wrap"' + (s.image_watermark_type === 'image' ? ' hidden' : '') + '>' +
-						'<input class="ce-input" id="ce-img-watermark" value="' + esc(s.image_watermark) + '" placeholder="ex.: seusite.com.br">' +
-						'<p class="ce-hint">Aplicado como texto no canto inferior direito.</p>' +
-					'</div>' +
-					'<div id="ce-wm-image-wrap"' + (s.image_watermark_type !== 'image' ? ' hidden' : '') + '>' +
-						'<p style="margin:0 0 8px">' +
-							'<button class="ce-btn ce-btn-sm" id="ce-wm-pick-media" type="button">🖼 Escolher da Biblioteca de Mídia</button> ' +
-							(s.image_watermark_media_url ? '<img src="' + esc(s.image_watermark_media_url) + '" alt="" style="height:36px;vertical-align:middle;margin-left:8px;border-radius:4px;border:1px solid var(--ce-line)" id="ce-wm-preview">' : '<img id="ce-wm-preview" alt="" style="height:36px;vertical-align:middle;margin-left:8px;border-radius:4px;display:none">') +
-						'</p>' +
-						'<input type="hidden" id="ce-wm-media-id" value="' + (s.image_watermark_media_id || '') + '">' +
-						'<input class="ce-input" id="ce-img-watermark-url" value="' + esc(s.image_watermark_url) + '" placeholder="ou cole a URL de uma imagem (PNG com fundo transparente funciona melhor)">' +
-						'<p class="ce-hint">Sobreposto no canto inferior direito, redimensionado automaticamente. A Biblioteca de Mídia tem prioridade sobre a URL.</p>' +
-					'</div>' +
-				'</div>' +
-
-				'<div class="ce-field"><label>Prompt mestre de imagem</label>' +
-				'<textarea class="ce-textarea" id="ce-img-prompt-master" style="min-height:150px">' + esc(s.image_prompt) + '</textarea>' +
-				'<p class="ce-hint">Variáveis disponíveis: {{title}}, {{keyword}}, {{site_name}}, {{cluster_name}}, {{colors}}, {{style_notes}}. Estilos e proporção marcados acima são adicionados automaticamente — não precisa repetir aqui.</p></div>' +
+				'<h2 class="ce-h2">Imagens</h2>' +
+				'<p class="ce-sub">A geração, conversão WebP, presets e todas as configurações de imagem agora ficam centralizadas na página <b>Imagens</b>.</p>' +
+				'<p><a class="ce-btn ce-btn-primary" href="' + esc((CE61.pages && CE61.pages.images) || '#') + '">Abrir página de Imagens →</a></p>' +
 			'</div>' +
 			'<p style="margin-top:18px"><button class="ce-btn ce-btn-primary" id="ce-save-settings">Salvar configurações</button> ' +
 			'<button class="ce-btn" id="ce-test-ai">⚡ Testar conexão IA</button></p>';
-
-		function renderModelOptions() {
-			var provider = $('#ce-img-provider').value;
-			var models = CE61.imageCatalog[provider] || {};
-			var sel = $('#ce-img-model');
-			var current = s.image_model && models[s.image_model] ? s.image_model : Object.keys(models)[0];
-			sel.innerHTML = Object.keys(models).map(function (k) {
-				return '<option value="' + k + '"' + (k === current ? ' selected' : '') + '>' + esc(models[k].label) + '</option>';
-			}).join('');
-			var note = $('#ce-img-model-note');
-			if (note && models[current]) { note.textContent = models[current].note || ''; }
-			sel.onchange = function () { var m = models[this.value]; if (note) { note.textContent = m ? (m.note || '') : ''; } };
-		}
-		renderModelOptions();
-		$('#ce-img-provider').addEventListener('change', renderModelOptions);
-
-		$$('input[name="ce-wm-type"]', el).forEach(function (r) {
-			r.addEventListener('change', function () {
-				$('#ce-wm-text-wrap').hidden = (this.value !== 'text');
-				$('#ce-wm-image-wrap').hidden = (this.value !== 'image');
-			});
-		});
-		var pickBtn = $('#ce-wm-pick-media');
-		if (pickBtn) {
-			pickBtn.addEventListener('click', function (e) {
-				e.preventDefault();
-				if (!window.wp || !wp.media) { toast('Biblioteca de mídia indisponível nesta tela', true); return; }
-				var frame = wp.media({ title: 'Escolher imagem de watermark', multiple: false, library: { type: 'image' } });
-				frame.on('select', function () {
-					var att = frame.state().get('selection').first().toJSON();
-					$('#ce-wm-media-id').value = att.id;
-					var prev = $('#ce-wm-preview');
-					prev.src = att.sizes && att.sizes.thumbnail ? att.sizes.thumbnail.url : att.url;
-					prev.style.display = 'inline-block';
-				});
-				frame.open();
-			});
-		}
 
 		$('#ce-test-ai').addEventListener('click', function () {
 			var b = $('#ce-test-ai');
@@ -2509,18 +2842,7 @@
 				sim_weak: $('#ce-sim-weak').value,
 				sim_cannibal: $('#ce-sim-cannibal').value,
 				min_words: $('#ce-min-words').value,
-				stale_months: $('#ce-stale').value,
-				image_provider: $('#ce-img-provider').value,
-				image_model: $('#ce-img-model').value,
-				image_aspect: $('#ce-img-aspect').value,
-				image_style_presets: $$('.ce-img-preset:checked', el).map(function (c) { return c.value; }),
-				image_colors: $('#ce-img-colors').value,
-				image_style: $('#ce-img-style').value,
-				image_prompt: $('#ce-img-prompt-master').value,
-				image_watermark_type: $('input[name="ce-wm-type"]:checked', el) ? $('input[name="ce-wm-type"]:checked', el).value : 'text',
-				image_watermark: $('#ce-img-watermark').value,
-				image_watermark_url: $('#ce-img-watermark-url').value,
-				image_watermark_media_id: $('#ce-wm-media-id').value || 0
+				stale_months: $('#ce-stale').value
 			};
 			['anthropic', 'openai', 'gemini'].forEach(function (p) {
 				var input = $('#ce-key-' + p);
@@ -2535,14 +2857,6 @@
 			api('save_settings', { settings: settings }).then(function () {
 				toast('Configurações salvas');
 				CE61.settings.provider = settings.provider;
-				CE61.settings.image_provider = settings.image_provider;
-				CE61.settings.image_prompt = settings.image_prompt;
-				CE61.settings.image_model = settings.image_model;
-				CE61.settings.image_aspect = settings.image_aspect;
-				CE61.settings.image_style_presets = settings.image_style_presets;
-				CE61.settings.image_watermark_type = settings.image_watermark_type;
-				CE61.settings.image_watermark_url = settings.image_watermark_url;
-				CE61.settings.image_watermark_media_id = settings.image_watermark_media_id;
 				['anthropic', 'openai', 'gemini'].forEach(function (p) {
 					if (settings['api_key_' + p] === '__CLEAR__') {
 						CE61.settings.has_key[p] = false;

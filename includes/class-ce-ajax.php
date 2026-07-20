@@ -19,6 +19,8 @@ class CE61_Ajax {
 			'merge_apply', 'schema_scan', 'schema_results', 'schema_fix_article', 'schema_fix_faq', 'schema_post_types', 'schema_queue_add', 'schema_remove', 'schema_repair',
 			'headings_preview', 'apply_headings',
 			'images_list', 'image_prompt', 'image_generate', 'images_queue_add',
+			'image_generate_inline', 'images_convert_list', 'image_convert', 'images_convert_queue_add',
+			'image_presets', 'image_preset_save', 'image_preset_delete', 'image_reference_upload', 'image_errors',
 			'stock_search', 'stock_apply', 'stock_status',
 			'save_settings', 'save_prompts', 'reset_prompt', 'rename_cluster', 'set_pillar',
 			'creator_data', 'suggest_clusters', 'create_cluster', 'delete_cluster',
@@ -1065,6 +1067,261 @@ class CE61_Ajax {
 			$added++;
 		}
 		wp_send_json_success( array( 'added' => $added ) );
+	}
+
+	/* ---------- Imagens dentro do post (in-content) ---------- */
+
+	/**
+	 * Resolve os bytes de referência a partir do POST: reference_id (biblioteca /
+	 * upload já sideloaded) ou preset editorial. Devolve bytes|null.
+	 */
+	private static function resolve_reference_bytes() {
+		$rid = isset( $_POST['reference_id'] ) ? absint( $_POST['reference_id'] ) : 0;
+		if ( $rid ) {
+			return CE61_Images::reference_bytes_from_attachment( $rid );
+		}
+		return null;
+	}
+
+	/**
+	 * Gera imagem(ns) e insere DENTRO do corpo do post na posição escolhida.
+	 * Aceita prompt customizado, imagem de referência, presets de estilo,
+	 * proporção, modelo e quantidade. Opcionalmente salva um preset.
+	 */
+	public static function image_generate_inline() {
+		self::guard();
+		@set_time_limit( 180 );
+		$pid = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		if ( ! get_post( $pid ) ) {
+			wp_send_json_error( array( 'message' => __( 'Post não encontrado.', 'cluster-engine' ) ) );
+		}
+		$position = isset( $_POST['position'] ) ? sanitize_key( $_POST['position'] ) : 'after_h2';
+		if ( ! in_array( $position, array( 'start', 'after_h2', 'end' ), true ) ) {
+			$position = 'after_h2';
+		}
+		$quantity = isset( $_POST['quantity'] ) ? max( 1, min( 3, (int) $_POST['quantity'] ) ) : 1;
+		$prompt   = isset( $_POST['prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
+
+		$overrides = array();
+		if ( ! empty( $_POST['model'] ) ) {
+			$overrides['model'] = sanitize_text_field( wp_unslash( $_POST['model'] ) );
+		}
+		if ( ! empty( $_POST['aspect'] ) ) {
+			$overrides['aspect'] = sanitize_key( $_POST['aspect'] );
+		}
+		if ( isset( $_POST['style_presets'] ) ) {
+			$overrides['style_presets'] = array_map( 'sanitize_key', (array) json_decode( wp_unslash( $_POST['style_presets'] ), true ) );
+		}
+		$ref = self::resolve_reference_bytes();
+		if ( $ref ) {
+			$overrides['reference_bytes'] = $ref;
+		}
+		if ( '' === trim( $prompt ) ) {
+			$prompt = CE61_Images::resolve_prompt( $pid, '', $overrides );
+		}
+
+		$inserted = array();
+		for ( $i = 0; $i < $quantity; $i++ ) {
+			$bytes = CE61_Images::generate( $prompt, $overrides );
+			if ( is_wp_error( $bytes ) ) {
+				self::log_image_error( $pid, $bytes->get_error_message() );
+				if ( ! $inserted ) {
+					wp_send_json_error( array( 'message' => $bytes->get_error_message() ) );
+				}
+				break;
+			}
+			$bytes  = CE61_Images::apply_watermark( $bytes );
+			$result = CE61_Images::attach_inline( $pid, $bytes, array(), $position );
+			if ( is_wp_error( $result ) ) {
+				self::log_image_error( $pid, $result->get_error_message() );
+				if ( ! $inserted ) {
+					wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+				}
+				break;
+			}
+			$inserted[] = array( 'attachment_id' => (int) $result['attachment_id'], 'url' => $result['url'] );
+		}
+
+		// Salva preset (modelo editorial) se pedido.
+		if ( ! empty( $_POST['save_preset'] ) && ! empty( $_POST['preset_label'] ) ) {
+			CE61_Images::preset_save( array(
+				'label'         => sanitize_text_field( wp_unslash( $_POST['preset_label'] ) ),
+				'prompt'        => $prompt,
+				'style_presets' => isset( $overrides['style_presets'] ) ? $overrides['style_presets'] : array(),
+				'aspect'        => isset( $overrides['aspect'] ) ? $overrides['aspect'] : '',
+				'model'         => isset( $overrides['model'] ) ? $overrides['model'] : '',
+				'reference_id'  => isset( $_POST['reference_id'] ) ? absint( $_POST['reference_id'] ) : 0,
+			) );
+		}
+
+		wp_send_json_success( array(
+			'inserted' => $inserted,
+			'count'    => count( $inserted ),
+			'edit'     => get_edit_post_link( $pid, 'raw' ),
+		) );
+	}
+
+	/* ---------- Conversão WebP das imagens dos artigos ---------- */
+
+	/**
+	 * Lista as imagens dos artigos indexados candidatas à conversão WebP.
+	 */
+	public static function images_convert_list() {
+		self::guard();
+		wp_send_json_success( array( 'images' => CE61_Media::article_images() ) );
+	}
+
+	/**
+	 * Converte UM anexo para WebP mantendo o original (reversível).
+	 */
+	public static function image_convert() {
+		self::guard();
+		@set_time_limit( 120 );
+		$aid = isset( $_POST['attachment_id'] ) ? absint( $_POST['attachment_id'] ) : 0;
+		if ( ! $aid ) {
+			wp_send_json_error( array( 'message' => __( 'Anexo inválido.', 'cluster-engine' ) ) );
+		}
+		$result = CE61_Media::convert_attachment( $aid );
+		if ( is_wp_error( $result ) ) {
+			self::log_image_error( 0, $result->get_error_message() );
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		wp_send_json_success( $result );
+	}
+
+	/**
+	 * Enfileira conversão WebP em massa das imagens marcadas.
+	 */
+	public static function images_convert_queue_add() {
+		self::guard();
+		$ids = isset( $_POST['attachment_ids'] ) ? json_decode( wp_unslash( $_POST['attachment_ids'] ), true ) : null;
+		if ( ! is_array( $ids ) || ! $ids ) {
+			wp_send_json_error( array( 'message' => __( 'Nenhuma imagem selecionada.', 'cluster-engine' ) ) );
+		}
+		$added = 0;
+		foreach ( array_slice( $ids, 0, 300 ) as $aid ) {
+			$aid = absint( $aid );
+			if ( ! $aid ) {
+				continue;
+			}
+			CE61_Queue::add( 'convert_image', array( 'attachment_id' => $aid ) );
+			$added++;
+		}
+		wp_send_json_success( array( 'added' => $added ) );
+	}
+
+	/* ---------- Presets de imagem (modelos do usuário) ---------- */
+
+	public static function image_presets() {
+		self::guard();
+		wp_send_json_success( array( 'presets' => CE61_Images::presets() ) );
+	}
+
+	public static function image_preset_save() {
+		self::guard();
+		$data = isset( $_POST['preset'] ) ? json_decode( wp_unslash( $_POST['preset'] ), true ) : null;
+		if ( ! is_array( $data ) ) {
+			wp_send_json_error( array( 'message' => __( 'Dados do preset inválidos.', 'cluster-engine' ) ) );
+		}
+		$result = CE61_Images::preset_save( $data );
+		if ( is_wp_error( $result ) ) {
+			wp_send_json_error( array( 'message' => $result->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'presets' => $result ) );
+	}
+
+	public static function image_preset_delete() {
+		self::guard();
+		$id = isset( $_POST['id'] ) ? sanitize_key( $_POST['id'] ) : '';
+		wp_send_json_success( array( 'presets' => CE61_Images::preset_delete( $id ) ) );
+	}
+
+	/**
+	 * Recebe uma imagem de referência via upload (drag-and-drop ou seleção no
+	 * dispositivo) e a coloca na Biblioteca de Mídia. Devolve o attachment_id
+	 * para ser usado como referência na geração.
+	 */
+	public static function image_reference_upload() {
+		self::guard();
+		if ( empty( $_FILES['file'] ) ) {
+			wp_send_json_error( array( 'message' => __( 'Nenhum arquivo enviado.', 'cluster-engine' ) ) );
+		}
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+
+		$overrides = array( 'test_form' => false, 'mimes' => array(
+			'jpg|jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif',
+		) );
+		$file = wp_handle_upload( $_FILES['file'], $overrides );
+		if ( isset( $file['error'] ) ) {
+			wp_send_json_error( array( 'message' => $file['error'] ) );
+		}
+		$attach_id = wp_insert_attachment( array(
+			'post_mime_type' => $file['type'],
+			'post_title'     => sanitize_file_name( pathinfo( $file['file'], PATHINFO_FILENAME ) ),
+			'post_status'    => 'inherit',
+		), $file['file'] );
+		if ( is_wp_error( $attach_id ) ) {
+			wp_send_json_error( array( 'message' => $attach_id->get_error_message() ) );
+		}
+		wp_update_attachment_metadata( $attach_id, wp_generate_attachment_metadata( $attach_id, $file['file'] ) );
+		update_post_meta( $attach_id, '_ce61_reference', 1 );
+		wp_send_json_success( array(
+			'attachment_id' => (int) $attach_id,
+			'url'           => wp_get_attachment_image_url( $attach_id, 'medium' ),
+		) );
+	}
+
+	/* ---------- Log de erros de imagem ---------- */
+
+	/**
+	 * Registra um erro de imagem (geração/conversão) num buffer circular em
+	 * option, para exibição centralizada na página de Imagens.
+	 */
+	private static function log_image_error( $post_id, $message ) {
+		$log = get_option( 'ce61_image_errors', array() );
+		if ( ! is_array( $log ) ) {
+			$log = array();
+		}
+		array_unshift( $log, array(
+			'time'    => current_time( 'mysql' ),
+			'post_id' => (int) $post_id,
+			'title'   => $post_id ? get_the_title( $post_id ) : '',
+			'message' => wp_strip_all_tags( (string) $message ),
+		) );
+		$log = array_slice( $log, 0, 50 );
+		update_option( 'ce61_image_errors', $log, false );
+	}
+
+	/**
+	 * Lista os erros de imagem: os registrados pelo plugin + os jobs de imagem
+	 * que falharam na fila (geração/conversão em massa).
+	 */
+	public static function image_errors() {
+		self::guard();
+		global $wpdb;
+		$manual = get_option( 'ce61_image_errors', array() );
+		$manual = is_array( $manual ) ? $manual : array();
+
+		$rows = $wpdb->get_results(
+			"SELECT id, job_type, payload, error, started_at FROM {$wpdb->prefix}ce_queue
+			 WHERE status = 'error' AND job_type IN ('generate_image','convert_image')
+			 ORDER BY id DESC LIMIT 50", ARRAY_A
+		);
+		$queue = array();
+		foreach ( (array) $rows as $r ) {
+			$p   = json_decode( $r['payload'], true );
+			$pid = isset( $p['post_id'] ) ? (int) $p['post_id'] : 0;
+			$queue[] = array(
+				'time'    => $r['started_at'],
+				'post_id' => $pid,
+				'title'   => $pid ? get_the_title( $pid ) : ( 'convert_image' === $r['job_type'] ? __( 'Conversão em massa', 'cluster-engine' ) : '' ),
+				'message' => wp_strip_all_tags( (string) $r['error'] ),
+				'source'  => $r['job_type'],
+			);
+		}
+		wp_send_json_success( array( 'manual' => $manual, 'queue' => $queue ) );
 	}
 
 	/* ---------- Bancos de imagens gratuitos (Unsplash/Pexels/Pixabay/Openverse) ---------- */
@@ -2658,6 +2915,16 @@ class CE61_Ajax {
 		}
 		if ( isset( $in['image_source_default'] ) ) {
 			$cur['image_source_default'] = sanitize_key( $in['image_source_default'] );
+		}
+		if ( isset( $in['image_webp'] ) ) {
+			$cur['image_webp'] = (bool) $in['image_webp'];
+		} elseif ( ! isset( $cur['image_webp'] ) ) {
+			$cur['image_webp'] = true;
+		}
+		if ( isset( $in['image_webp_quality'] ) ) {
+			$cur['image_webp_quality'] = min( 100, max( 40, (int) $in['image_webp_quality'] ) );
+		} elseif ( ! isset( $cur['image_webp_quality'] ) ) {
+			$cur['image_webp_quality'] = 82;
 		}
 		update_option( 'ce61_settings', $cur );
 		CE61_History::ensure_scheduled(); // reagenda o cron diário se o horário mudou.

@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.26.0
+Stable tag: 2.27.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,15 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.27.0 =
+* Novo: **página "Imagens" dedicada** que centraliza tudo — geração de destacadas e imagens no conteúdo, conversão WebP, presets, configurações e log de erros — em sub-abas próprias. A aba Imagens saiu do Painel e as configurações de imagem saíram das Configurações gerais.
+* Novo: **imagens dentro do post (in-content)** — gere 1 a 3 imagens otimizadas em WebP com SEO completo (nome de arquivo, alt, título, legenda e descrição) e insira no corpo do artigo na posição que você escolher (início, após o 1º H2 ou no final).
+* Novo: **conversão para WebP** das imagens dos artigos (destacadas e anexos) mantendo sempre o original — operação reversível — com repontamento automático de imagem destacada e URLs no conteúdo. Conversão avulsa ou em massa pela Fila.
+* Novo: **imagem de referência** na geração (image-to-image) via Biblioteca de Mídia, upload por arraste ou seleção de arquivo — suportada em OpenAI (edits) e Gemini (inlineData).
+* Novo: **prompt de otimização por geração** para sobrescrever o prompt mestre quando quiser.
+* Novo: **biblioteca de presets** de imagem, alimentada por você ao gerar, para manter a mesma linha editorial e reaplicar modelos com um clique.
+* Novo: **otimização WebP configurável** (ligar/desligar e qualidade 40–100) aplicada às imagens geradas e enviadas pelo plugin.
 
 = 2.26.0 =
 * Novo: **filtro por status** na página de Schema — "Somente com pendências" (padrão), "Todas as páginas" ou "Somente completas", para focar direto nas páginas que precisam de correção.

@@ -194,13 +194,18 @@ class CE61_Images {
 				return new WP_Error( 'ce61_img', isset( $body['error']['message'] ) ? $body['error']['message'] : __( 'Resposta inesperada do Imagen.', 'cluster-engine' ) );
 			}
 
+			$parts = array( array( 'text' => $prompt ) );
+			if ( ! empty( $overrides['reference_bytes'] ) ) {
+				$ref_mime = self::sniff_mime( $overrides['reference_bytes'] );
+				$parts[]  = array( 'inline_data' => array( 'mime_type' => $ref_mime, 'data' => base64_encode( $overrides['reference_bytes'] ) ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions
+			}
 			$res = wp_remote_post(
 				'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode( $model ) . ':generateContent?key=' . rawurlencode( $key ),
 				array(
 					'timeout' => 55,
 					'headers' => array( 'Content-Type' => 'application/json' ),
 					'body'    => wp_json_encode( array(
-						'contents'         => array( array( 'parts' => array( array( 'text' => $prompt ) ) ) ),
+						'contents'         => array( array( 'parts' => $parts ) ),
 						'generationConfig' => array(
 							'responseModalities' => array( 'TEXT', 'IMAGE' ),
 							'imageConfig'         => array( 'aspectRatio' => $ratio ),
@@ -238,6 +243,11 @@ class CE61_Images {
 			$model = 'gpt-image-1';
 		}
 		$size = self::resolve_dimensions( 'openai', $model, $aspect );
+
+		// Imagem de referência → endpoint de edição (image-to-image) via multipart.
+		if ( ! empty( $overrides['reference_bytes'] ) ) {
+			return self::openai_edit( $key, $model, $prompt, $size, $overrides['reference_bytes'] );
+		}
 
 		$body = array(
 			'model'  => $model,
@@ -291,6 +301,79 @@ class CE61_Images {
 			}
 		}
 		return new WP_Error( 'ce61_img', $err ? $err : __( 'Resposta inesperada da OpenAI.', 'cluster-engine' ) );
+	}
+
+	/**
+	 * Detecta o MIME de bytes de imagem (para enviar a referência com o tipo
+	 * certo às APIs). Cai em image/png quando não consegue identificar.
+	 */
+	private static function sniff_mime( $bytes ) {
+		if ( function_exists( 'getimagesizefromstring' ) ) {
+			$info = @getimagesizefromstring( $bytes );
+			if ( ! empty( $info['mime'] ) ) {
+				return $info['mime'];
+			}
+		}
+		return 'image/png';
+	}
+
+	/**
+	 * Geração com imagem de referência na OpenAI (endpoint /images/edits).
+	 * Monta um corpo multipart/form-data manualmente porque wp_remote_post não
+	 * envia arquivos binários por conta própria.
+	 */
+	private static function openai_edit( $key, $model, $prompt, $size, $ref_bytes ) {
+		$mime     = self::sniff_mime( $ref_bytes );
+		$ext      = 'image/webp' === $mime ? 'webp' : ( 'image/jpeg' === $mime ? 'jpg' : 'png' );
+		$boundary = 'ce61' . md5( microtime() . wp_rand() );
+		$eol      = "\r\n";
+
+		$fields = array(
+			'model'  => $model,
+			'prompt' => $prompt,
+			'n'      => '1',
+			'size'   => $size,
+		);
+		$payload = '';
+		foreach ( $fields as $name => $value ) {
+			$payload .= '--' . $boundary . $eol;
+			$payload .= 'Content-Disposition: form-data; name="' . $name . '"' . $eol . $eol;
+			$payload .= $value . $eol;
+		}
+		$payload .= '--' . $boundary . $eol;
+		$payload .= 'Content-Disposition: form-data; name="image"; filename="reference.' . $ext . '"' . $eol;
+		$payload .= 'Content-Type: ' . $mime . $eol . $eol;
+		$payload .= $ref_bytes . $eol;
+		$payload .= '--' . $boundary . '--' . $eol;
+
+		$res = wp_remote_post( 'https://api.openai.com/v1/images/edits', array(
+			'timeout' => 90,
+			'headers' => array(
+				'Authorization' => 'Bearer ' . $key,
+				'Content-Type'  => 'multipart/form-data; boundary=' . $boundary,
+			),
+			'body'    => $payload,
+		) );
+		if ( is_wp_error( $res ) ) {
+			return $res;
+		}
+		$http_code = (int) wp_remote_retrieve_response_code( $res );
+		$data      = json_decode( wp_remote_retrieve_body( $res ), true );
+		$err       = isset( $data['error']['message'] ) ? $data['error']['message'] : '';
+		if ( $http_code && $http_code >= 400 ) {
+			$api_msg = $err ? $err : wp_remote_retrieve_response_message( $res );
+			return new WP_Error( 'ce61_img', sprintf( 'OpenAI edits HTTP %d: %s', $http_code, $api_msg ) );
+		}
+		if ( isset( $data['data'][0]['b64_json'] ) ) {
+			return base64_decode( $data['data'][0]['b64_json'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions
+		}
+		if ( isset( $data['data'][0]['url'] ) ) {
+			$img = wp_remote_get( $data['data'][0]['url'], array( 'timeout' => 60 ) );
+			if ( ! is_wp_error( $img ) ) {
+				return wp_remote_retrieve_body( $img );
+			}
+		}
+		return new WP_Error( 'ce61_img', $err ? $err : __( 'Resposta inesperada da OpenAI (edits).', 'cluster-engine' ) );
 	}
 
 	public static function apply_watermark( $bytes ) {
@@ -392,29 +475,98 @@ class CE61_Images {
 		return $out ? $out : $bytes;
 	}
 
+	/* ---------- Otimização WebP ---------- */
+
 	/**
-	 * Salva os bytes na Biblioteca de Mídia e define como imagem destacada,
-	 * preenchendo TODOS os campos relevantes para SEO de imagem:
-	 * - nome de arquivo baseado na keyword/título (não um nome genérico);
-	 * - Alt text (acessibilidade + Google Imagens);
-	 * - Título do anexo;
-	 * - Legenda (caption) — reforça o tema para quem vê a página;
-	 * - Descrição — contexto adicional indexável.
-	 *
-	 * @param array $meta { keyword?, alt?, caption?, description? } — sobrescreve os textos padrão.
+	 * Converte bytes de imagem (PNG/JPEG) para WebP otimizado, respeitando as
+	 * Configurações (ativar/desativar e qualidade). Usa GD (imagewebp) e, na
+	 * falta, Imagick. Retorna os bytes WebP ou null quando não é possível/desligado
+	 * — nesse caso o chamador segue com o formato original.
 	 */
-	public static function attach_as_featured( $post_id, $bytes, $meta = array() ) {
+	public static function to_webp( $bytes, $force = false ) {
+		$s       = get_option( 'ce61_settings', array() );
+		$enabled = ! isset( $s['image_webp'] ) || $s['image_webp'];
+		if ( ( ! $enabled && ! $force ) || '' === (string) $bytes ) {
+			return null;
+		}
+		$quality = isset( $s['image_webp_quality'] ) && (int) $s['image_webp_quality'] > 0
+			? min( 100, max( 40, (int) $s['image_webp_quality'] ) )
+			: 82;
+
+		if ( function_exists( 'imagecreatefromstring' ) && function_exists( 'imagewebp' ) ) {
+			$im = @imagecreatefromstring( $bytes );
+			if ( $im ) {
+				if ( function_exists( 'imagepalettetotruecolor' ) ) {
+					@imagepalettetotruecolor( $im );
+				}
+				imagealphablending( $im, false );
+				imagesavealpha( $im, true );
+				ob_start();
+				$ok  = @imagewebp( $im, null, $quality );
+				$out = ob_get_clean();
+				imagedestroy( $im );
+				if ( $ok && $out ) {
+					return $out;
+				}
+			}
+		}
+
+		if ( class_exists( 'Imagick' ) ) {
+			try {
+				$img = new Imagick();
+				$img->readImageBlob( $bytes );
+				$img->setImageFormat( 'webp' );
+				$img->setImageCompressionQuality( $quality );
+				$out = $img->getImageBlob();
+				$img->clear();
+				$img->destroy();
+				if ( $out ) {
+					return $out;
+				}
+			} catch ( Exception $e ) {
+				return null;
+			}
+		}
+		return null;
+	}
+
+	/* ---------- Anexo com SEO completo ---------- */
+
+	/**
+	 * Salva os bytes na Biblioteca de Mídia (convertendo para WebP quando
+	 * possível) preenchendo TODOS os campos relevantes para SEO de imagem:
+	 * nome de arquivo baseado na keyword/título, Alt text, Título, Legenda e
+	 * Descrição. NÃO define como destacada nem insere no corpo — apenas cria o
+	 * anexo e devolve os dados. É a base compartilhada por attach_as_featured()
+	 * e attach_inline().
+	 *
+	 * @param array $meta { keyword?, alt?, caption?, description?, slug_suffix? }.
+	 */
+	public static function store_attachment( $post_id, $bytes, $meta = array() ) {
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 
 		$title   = get_the_title( $post_id );
 		$keyword = isset( $meta['keyword'] ) && $meta['keyword'] ? $meta['keyword'] : self::guess_keyword( $post_id );
 		$site    = get_bloginfo( 'name' );
 
+		// Otimização: converte para WebP quando o servidor suporta e está ligado.
+		$ext  = 'png';
+		$mime = 'image/png';
+		$webp = self::to_webp( $bytes );
+		if ( null !== $webp ) {
+			$bytes = $webp;
+			$ext   = 'webp';
+			$mime  = 'image/webp';
+		}
+
 		// Nome de arquivo amigável para SEO (Google Imagens também lê a URL).
 		$slug_source = $keyword ? $keyword : $title;
 		$slug        = sanitize_title( $slug_source );
-		$slug        = $slug ? $slug : 'imagem-destacada';
-		$filename    = $slug . '-' . substr( md5( $post_id . microtime() ), 0, 6 ) . '.png';
+		$slug        = $slug ? $slug : 'imagem';
+		if ( ! empty( $meta['slug_suffix'] ) ) {
+			$slug .= '-' . sanitize_title( (string) $meta['slug_suffix'] );
+		}
+		$filename = $slug . '-' . substr( md5( $post_id . microtime() ), 0, 6 ) . '.' . $ext;
 
 		$upload = wp_upload_bits( $filename, null, $bytes );
 		if ( ! empty( $upload['error'] ) ) {
@@ -432,7 +584,7 @@ class CE61_Images {
 			);
 
 		$attachment = array(
-			'post_mime_type' => 'image/png',
+			'post_mime_type' => $mime,
 			'post_title'     => wp_strip_all_tags( $title ),
 			'post_excerpt'   => wp_strip_all_tags( $caption ),  // legenda (caption).
 			'post_content'   => wp_strip_all_tags( $description ), // descrição.
@@ -443,13 +595,197 @@ class CE61_Images {
 			return $attach_id;
 		}
 		wp_update_attachment_metadata( $attach_id, wp_generate_attachment_metadata( $attach_id, $upload['file'] ) );
-
 		update_post_meta( $attach_id, '_wp_attachment_image_alt', wp_strip_all_tags( $alt ) );
-
-		set_post_thumbnail( $post_id, $attach_id );
+		update_post_meta( $attach_id, '_ce61_generated', 1 ); // marca como gerada pelo plugin.
 
 		$url = wp_get_attachment_image_url( $attach_id, 'large' );
-		return array( 'attachment_id' => $attach_id, 'url' => $url ? $url : $upload['url'] );
+		return array(
+			'attachment_id' => $attach_id,
+			'url'           => $url ? $url : $upload['url'],
+			'mime'          => $mime,
+			'alt'           => wp_strip_all_tags( $alt ),
+			'caption'       => wp_strip_all_tags( $caption ),
+		);
+	}
+
+	/**
+	 * Cria o anexo (WebP + SEO) e define como imagem destacada do post.
+	 */
+	public static function attach_as_featured( $post_id, $bytes, $meta = array() ) {
+		$stored = self::store_attachment( $post_id, $bytes, $meta );
+		if ( is_wp_error( $stored ) ) {
+			return $stored;
+		}
+		set_post_thumbnail( $post_id, $stored['attachment_id'] );
+		return array( 'attachment_id' => $stored['attachment_id'], 'url' => $stored['url'] );
+	}
+
+	/**
+	 * Cria o anexo (WebP + SEO) e insere a imagem DENTRO do corpo do post como
+	 * <figure> semântico (img com alt/title/width/height/loading/decoding +
+	 * <figcaption>), na posição escolhida: 'start', 'after_h2' (após o 1º H2) ou
+	 * 'end'. Não altera a imagem destacada.
+	 *
+	 * @param string $position start|after_h2|end
+	 */
+	public static function attach_inline( $post_id, $bytes, $meta = array(), $position = 'after_h2' ) {
+		$post = get_post( $post_id );
+		if ( ! $post ) {
+			return new WP_Error( 'ce61_no_post', __( 'Post não encontrado.', 'cluster-engine' ) );
+		}
+		$meta['slug_suffix'] = isset( $meta['slug_suffix'] ) ? $meta['slug_suffix'] : 'ilustracao';
+		$stored              = self::store_attachment( $post_id, $bytes, $meta );
+		if ( is_wp_error( $stored ) ) {
+			return $stored;
+		}
+
+		$figure  = self::build_figure( $stored['attachment_id'], $stored['alt'], $stored['caption'] );
+		$content = self::insert_at_position( (string) $post->post_content, $figure, $position );
+
+		$upd = wp_update_post( array( 'ID' => $post_id, 'post_content' => wp_slash( $content ) ), true );
+		if ( is_wp_error( $upd ) ) {
+			return $upd;
+		}
+		return array( 'attachment_id' => $stored['attachment_id'], 'url' => $stored['url'], 'position' => $position );
+	}
+
+	/**
+	 * HTML de <figure> responsivo e otimizado para uma imagem já anexada.
+	 */
+	public static function build_figure( $attach_id, $alt, $caption ) {
+		$img = wp_get_attachment_image(
+			$attach_id,
+			'large',
+			false,
+			array(
+				'alt'      => $alt,
+				'title'    => $alt,
+				'loading'  => 'lazy',
+				'decoding' => 'async',
+				'class'    => 'ce61-inline-img',
+			)
+		);
+		if ( ! $img ) {
+			$url = wp_get_attachment_image_url( $attach_id, 'large' );
+			$img = '<img src="' . esc_url( $url ) . '" alt="' . esc_attr( $alt ) . '" title="' . esc_attr( $alt ) . '" loading="lazy" decoding="async" class="ce61-inline-img">';
+		}
+		$cap = $caption ? '<figcaption>' . esc_html( $caption ) . '</figcaption>' : '';
+		return "\n<figure class=\"ce61-figure wp-block-image size-large\" data-ce61-image=\"" . (int) $attach_id . "\">" . $img . $cap . "</figure>\n";
+	}
+
+	/**
+	 * Insere um bloco HTML no conteúdo na posição pedida. 'after_h2' cai após o
+	 * fechamento do primeiro H2; sem H2, insere após o 1º parágrafo; e, na falta
+	 * dele, no fim.
+	 */
+	private static function insert_at_position( $content, $block, $position ) {
+		if ( 'start' === $position ) {
+			return $block . "\n" . $content;
+		}
+		if ( 'end' === $position ) {
+			return $content . "\n" . $block;
+		}
+		// after_h2 (padrão).
+		if ( preg_match( '/<\/h2>/i', $content, $m, PREG_OFFSET_CAPTURE ) ) {
+			$at = $m[0][1] + strlen( $m[0][0] );
+			return substr( $content, 0, $at ) . $block . substr( $content, $at );
+		}
+		if ( preg_match( '/<\/p>/i', $content, $m, PREG_OFFSET_CAPTURE ) ) {
+			$at = $m[0][1] + strlen( $m[0][0] );
+			return substr( $content, 0, $at ) . $block . substr( $content, $at );
+		}
+		return $content . "\n" . $block;
+	}
+
+	/* ---------- Biblioteca de presets (modelos de imagem do usuário) ---------- */
+
+	/**
+	 * Lista os presets salvos pelo usuário (modelos de imagem reutilizáveis que
+	 * mantêm a mesma linha editorial). Cada preset guarda prompt, estilos,
+	 * proporção, provedor/modelo e, opcionalmente, uma imagem de referência.
+	 */
+	public static function presets() {
+		$list = get_option( 'ce61_image_presets', array() );
+		return is_array( $list ) ? array_values( $list ) : array();
+	}
+
+	/**
+	 * Salva (cria ou atualiza) um preset. Devolve a lista completa atualizada.
+	 *
+	 * @param array $data { id?, label, prompt?, style_presets?, aspect?, provider?, model?, reference_id? }
+	 */
+	public static function preset_save( $data ) {
+		$label = isset( $data['label'] ) ? sanitize_text_field( $data['label'] ) : '';
+		if ( '' === trim( $label ) ) {
+			return new WP_Error( 'ce61_preset', __( 'Dê um nome ao preset.', 'cluster-engine' ) );
+		}
+		$list = self::presets();
+		$id   = isset( $data['id'] ) && $data['id'] ? sanitize_key( $data['id'] ) : 'p' . substr( md5( microtime() . wp_rand() ), 0, 10 );
+
+		$preset = array(
+			'id'            => $id,
+			'label'         => $label,
+			'prompt'        => isset( $data['prompt'] ) ? sanitize_textarea_field( $data['prompt'] ) : '',
+			'style_presets' => isset( $data['style_presets'] ) ? array_values( array_map( 'sanitize_key', (array) $data['style_presets'] ) ) : array(),
+			'aspect'        => isset( $data['aspect'] ) ? sanitize_key( $data['aspect'] ) : '',
+			'provider'      => isset( $data['provider'] ) ? sanitize_key( $data['provider'] ) : '',
+			'model'         => isset( $data['model'] ) ? sanitize_text_field( $data['model'] ) : '',
+			'reference_id'  => isset( $data['reference_id'] ) ? (int) $data['reference_id'] : 0,
+			'updated'       => time(),
+		);
+
+		$found = false;
+		foreach ( $list as $i => $p ) {
+			if ( isset( $p['id'] ) && $p['id'] === $id ) {
+				$list[ $i ] = $preset;
+				$found      = true;
+				break;
+			}
+		}
+		if ( ! $found ) {
+			$list[] = $preset;
+		}
+		update_option( 'ce61_image_presets', array_values( $list ), false );
+		return self::presets();
+	}
+
+	/**
+	 * Remove um preset pelo id. Devolve a lista atualizada.
+	 */
+	public static function preset_delete( $id ) {
+		$id   = sanitize_key( $id );
+		$list = self::presets();
+		$out  = array();
+		foreach ( $list as $p ) {
+			if ( ! isset( $p['id'] ) || $p['id'] !== $id ) {
+				$out[] = $p;
+			}
+		}
+		update_option( 'ce61_image_presets', array_values( $out ), false );
+		return $out;
+	}
+
+	/**
+	 * Bytes de uma imagem de referência a partir de um anexo da biblioteca.
+	 * Usado tanto pelo campo de referência quanto pelo modelo editorial do preset.
+	 */
+	public static function reference_bytes_from_attachment( $attach_id ) {
+		$attach_id = (int) $attach_id;
+		if ( ! $attach_id ) {
+			return null;
+		}
+		$file = get_attached_file( $attach_id );
+		if ( $file && file_exists( $file ) ) {
+			return file_get_contents( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		}
+		$url = wp_get_attachment_url( $attach_id );
+		if ( $url ) {
+			$res = wp_remote_get( $url, array( 'timeout' => 30 ) );
+			if ( ! is_wp_error( $res ) ) {
+				return wp_remote_retrieve_body( $res );
+			}
+		}
+		return null;
 	}
 
 	/**

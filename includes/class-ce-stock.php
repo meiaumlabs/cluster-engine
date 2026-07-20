@@ -326,7 +326,10 @@ class CE61_Stock {
 	 * imagem destacada e grava a atribuição correta (obrigatória para
 	 * Openverse quando a licença exige, recomendada para Unsplash).
 	 */
-	public static function apply_to_post( $post_id, $image ) {
+	/**
+	 * Baixa os bytes da imagem escolhida e aplica o watermark configurado.
+	 */
+	private static function fetch_bytes( $image ) {
 		$url = isset( $image['full'] ) ? $image['full'] : '';
 		if ( ! $url ) {
 			return new WP_Error( 'ce61_stock', __( 'Imagem inválida.', 'cluster-engine' ) );
@@ -339,9 +342,44 @@ class CE61_Stock {
 		if ( ! $bytes ) {
 			return new WP_Error( 'ce61_stock', __( 'Não foi possível baixar a imagem.', 'cluster-engine' ) );
 		}
+		return CE61_Images::apply_watermark( $bytes );
+	}
 
+	/**
+	 * Notifica o Unsplash do download (exigência da API deles) ao USAR a imagem.
+	 */
+	private static function ping_download( $image ) {
+		if ( ! empty( $image['download_ping'] ) ) {
+			$key = self::key( 'unsplash' );
+			wp_remote_get( $image['download_ping'], array( 'timeout' => 10, 'headers' => array( 'Authorization' => 'Client-ID ' . $key ) ) );
+		}
+	}
+
+	/**
+	 * Baixa a imagem escolhida, otimiza (WebP), insere DENTRO do corpo do post
+	 * como <figure> na posição escolhida e grava a atribuição na legenda.
+	 */
+	public static function apply_inline( $post_id, $image, $position = 'after_h2' ) {
+		$bytes = self::fetch_bytes( $image );
+		if ( is_wp_error( $bytes ) ) {
+			return $bytes;
+		}
+		$credit = isset( $image['credit'] ) ? $image['credit'] : '';
+		$attach = CE61_Images::attach_inline( $post_id, $bytes, $credit ? array( 'caption' => $credit ) : array(), $position );
+		if ( is_wp_error( $attach ) ) {
+			return $attach;
+		}
+		update_post_meta( $attach['attachment_id'], '_ce61_image_credit', wp_json_encode( $image, JSON_UNESCAPED_UNICODE ) );
+		self::ping_download( $image );
+		return $attach;
+	}
+
+	public static function apply_to_post( $post_id, $image ) {
+		$bytes = self::fetch_bytes( $image );
+		if ( is_wp_error( $bytes ) ) {
+			return $bytes;
+		}
 		$settings = get_option( 'ce61_settings', array() );
-		$bytes    = CE61_Images::apply_watermark( $bytes );
 
 		$attach = CE61_Images::attach_as_featured( $post_id, $bytes );
 		if ( is_wp_error( $attach ) ) {
@@ -365,10 +403,7 @@ class CE61_Stock {
 
 		// Unsplash exige notificar o endpoint de download ao USAR a imagem
 		// (não na busca) — cumpre as diretrizes de uso da API deles.
-		if ( ! empty( $image['download_ping'] ) ) {
-			$key = self::key( 'unsplash' );
-			wp_remote_get( $image['download_ping'], array( 'timeout' => 10, 'headers' => array( 'Authorization' => 'Client-ID ' . $key ) ) );
-		}
+		self::ping_download( $image );
 
 		return $attach;
 	}

@@ -240,6 +240,8 @@ class CE61_Queue {
 				return CE61_Creator::job_generate_article( $payload );
 			case 'generate_image':
 				return self::job_generate_image( $payload );
+			case 'convert_image':
+				return self::job_convert_image( $payload );
 			case 'schema_fix':
 				return self::job_schema_fix( $payload );
 			default:
@@ -291,6 +293,22 @@ class CE61_Queue {
 			return $attach;
 		}
 		return array( 'attachment_id' => $attach['attachment_id'], 'url' => $attach['url'], 'source' => 'ai' );
+	}
+
+	/**
+	 * Job de conversão de imagem em massa: converte UM anexo (imagem de artigo)
+	 * para WebP mantendo o original e repondo as referências. Idempotente.
+	 */
+	private static function job_convert_image( $payload ) {
+		$attach_id = isset( $payload['attachment_id'] ) ? (int) $payload['attachment_id'] : 0;
+		if ( ! $attach_id ) {
+			return new WP_Error( 'ce61_job', __( 'Anexo inválido para conversão.', 'cluster-engine' ) );
+		}
+		$result = CE61_Media::convert_attachment( $attach_id );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		return array( 'new_id' => (int) $result['new_id'], 'url' => $result['url'], 'saved_bytes' => isset( $result['saved_bytes'] ) ? (int) $result['saved_bytes'] : 0 );
 	}
 
 	/**

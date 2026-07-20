@@ -40,7 +40,15 @@ class CE61_Admin {
 					'keywords'    => __( 'Palavras-chave', 'cluster-engine' ),
 					'diagnostics' => __( 'Diagnóstico', 'cluster-engine' ),
 					'schema'      => __( 'Schema', 'cluster-engine' ),
-					'images'      => __( 'Imagens', 'cluster-engine' ),
+				),
+			),
+			'images' => array(
+				'tabs' => array(
+					'images_articles' => __( 'Imagens dos artigos', 'cluster-engine' ),
+					'images_convert'  => __( 'Converter para WebP', 'cluster-engine' ),
+					'images_presets'  => __( 'Presets', 'cluster-engine' ),
+					'images_settings' => __( 'Configurações de imagem', 'cluster-engine' ),
+					'images_errors'   => __( 'Erros', 'cluster-engine' ),
 				),
 			),
 			'creator' => array(
@@ -89,6 +97,8 @@ class CE61_Admin {
 		add_submenu_page( 'cluster-engine', __( 'Painel', 'cluster-engine' ), __( 'Painel', 'cluster-engine' ), 'manage_options', 'cluster-engine', function () { self::render( 'main' ); } );
 		$hook = add_submenu_page( 'cluster-engine', __( 'Criação de Conteúdo', 'cluster-engine' ), __( 'Criação de Conteúdo', 'cluster-engine' ), 'manage_options', 'cluster-engine-creator', function () { self::render( 'creator' ); } );
 		self::$hooks[ $hook ] = 'creator';
+		$hook = add_submenu_page( 'cluster-engine', __( 'Imagens', 'cluster-engine' ), __( 'Imagens', 'cluster-engine' ), 'manage_options', 'cluster-engine-images', function () { self::render( 'images' ); } );
+		self::$hooks[ $hook ] = 'images';
 		$hook = add_submenu_page( 'cluster-engine', __( 'Configurações', 'cluster-engine' ), __( 'Configurações', 'cluster-engine' ), 'manage_options', 'cluster-engine-settings', function () { self::render( 'settings' ); } );
 		self::$hooks[ $hook ] = 'settings';
 		$hook = add_submenu_page( 'cluster-engine', __( 'Desempenho', 'cluster-engine' ), __( 'Desempenho', 'cluster-engine' ), 'manage_options', 'cluster-engine-performance', function () { self::render( 'performance' ); } );
@@ -124,6 +134,7 @@ class CE61_Admin {
 			'pages'    => array(
 				'main'        => admin_url( 'admin.php?page=cluster-engine' ),
 				'creator'     => admin_url( 'admin.php?page=cluster-engine-creator' ),
+				'images'      => admin_url( 'admin.php?page=cluster-engine-images' ),
 				'settings'    => admin_url( 'admin.php?page=cluster-engine-settings' ),
 				'performance' => admin_url( 'admin.php?page=cluster-engine-performance' ),
 				'network'     => admin_url( 'admin.php?page=cluster-engine-network' ),
@@ -148,6 +159,8 @@ class CE61_Admin {
 				'image_style'     => isset( $settings['image_style'] ) ? $settings['image_style'] : '',
 				'image_prompt'    => isset( $settings['image_prompt'] ) && '' !== trim( $settings['image_prompt'] ) ? $settings['image_prompt'] : CE61_Images::default_prompt(),
 				'image_aspect'         => isset( $settings['image_aspect'] ) ? $settings['image_aspect'] : 'wide',
+				'image_webp'           => ! isset( $settings['image_webp'] ) || $settings['image_webp'],
+				'image_webp_quality'   => isset( $settings['image_webp_quality'] ) ? (int) $settings['image_webp_quality'] : 82,
 				'image_style_presets'  => isset( $settings['image_style_presets'] ) ? (array) $settings['image_style_presets'] : array(),
 				'image_watermark_type' => isset( $settings['image_watermark_type'] ) ? $settings['image_watermark_type'] : 'text',
 				'image_watermark_url'  => isset( $settings['image_watermark_url'] ) ? $settings['image_watermark_url'] : '',
@@ -182,6 +195,7 @@ class CE61_Admin {
 			'imageCatalog'   => CE61_Images::catalog(),
 			'imageStylePresets' => CE61_Images::style_presets(),
 			'imageAspectRatios' => CE61_Images::aspect_ratios(),
+			'imagePresets'      => CE61_Images::presets(),
 			'google' => array(
 				'connected'    => CE61_Gsc::is_connected(),
 				'client_id'    => isset( $google['client_id'] ) ? $google['client_id'] : '',
@@ -210,6 +224,7 @@ class CE61_Admin {
 		$subtitles = array(
 			'main'        => __( 'Autoridade tópica, clusters e linkagem interna', 'cluster-engine' ),
 			'creator'     => __( 'Novos clusters e geração de conteúdo com base no seu site', 'cluster-engine' ),
+			'images'      => __( 'Geração, conversão WebP e SEO de todas as imagens dos artigos', 'cluster-engine' ),
 			'settings'    => __( 'Provedores de IA, prompts, limiares e integrações externas', 'cluster-engine' ),
 			'performance' => __( 'Posicionamento no Google, tráfego e cliques por página', 'cluster-engine' ),
 			'network'     => __( 'Como as palavras-chave conectam seus artigos', 'cluster-engine' ),
