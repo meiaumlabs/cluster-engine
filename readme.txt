@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.27.0
+Stable tag: 2.29.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,18 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.29.0 =
+* Novo: **Organizador de Categorias** — nova página com quatro abas para revisar, categorizar, popular de SEO/imagens e redirecionar.
+* Novo: **organizar posts** — a IA lê cada post e sugere a categoria que faz mais sentido. Nada é gravado sem a sua aprovação; ao aplicar, a categoria sugerida vira a primária mantendo as demais (não destrutivo).
+* Novo: **SEO e imagens por categoria** — gere e edite título de SEO, descrição de SEO, descrição nativa e imagem de capa de cada categoria. O SEO é gravado no local que o seu plugin de SEO ativo lê (Yoast, Rank Math, SEOPress) ou em campo nativo próprio.
+* Novo: **sugestão de novas categorias** — a IA analisa o conteúdo do site e propõe categorias que fariam sentido, com criação em um clique.
+* Novo: **redirects 301 integrados ao Rank Math** — página de gestão que lê e grava os mesmos redirects do módulo nativo do Rank Math quando ele está ativo; sem Rank Math, usa armazenamento próprio e resolve os redirects no front-end. Ao recategorizar um post e a URL mudar, um 301 é criado automaticamente.
+
+= 2.28.0 =
+* Novo: **provedor Groq** (Llama/Mixtral, compatível com a API da OpenAI) adicionado às opções de IA — geração de texto, análise e diagnóstico.
+* Novo: **atuação por tarefa** — em Configurações você escolhe qual provedor cuida de cada tipo de tarefa (Geração de texto, Análise, Diagnóstico e Imagens), independentemente do provedor principal. Cada seletor mostra apenas os provedores compatíveis com aquela tarefa; deixar em "Padrão" usa o provedor principal, e o fallback automático continua valendo quando o escolhido não tem chave.
+* Melhoria: o seletor de provedor de imagem passa a aparecer também nas Configurações, em sincronia com a página Imagens.
 
 = 2.27.0 =
 * Novo: **página "Imagens" dedicada** que centraliza tudo — geração de destacadas e imagens no conteúdo, conversão WebP, presets, configurações e log de erros — em sub-abas próprias. A aba Imagens saiu do Painel e as configurações de imagem saíram das Configurações gerais.

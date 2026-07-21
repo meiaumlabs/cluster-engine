@@ -100,7 +100,9 @@
 		images_articles: 'images', images_convert: 'images', images_presets: 'images', images_settings: 'images', images_errors: 'images',
 		creator: 'creator', queue: 'creator',
 		settings: 'settings', ai: 'settings', integrations: 'settings',
-		performance: 'performance', network: 'network'
+		performance: 'performance', network: 'network',
+		cpt_manage: 'cpt', cpt_content: 'cpt',
+		categories_organize: 'categories', categories_seo: 'categories', categories_suggest: 'categories', categories_redirects: 'categories'
 	};
 
 	function gotoTab(name) {
@@ -201,7 +203,11 @@
 			performance: renderPerformance,
 			network: renderNetwork,
 			cpt_manage: renderCptManage,
-			cpt_content: renderCptContent
+			cpt_content: renderCptContent,
+			categories_organize: renderCategoriesOrganize,
+			categories_seo: renderCategoriesSeo,
+			categories_suggest: renderCategoriesSuggest,
+			categories_redirects: renderCategoriesRedirects
 		}[name] || function () {})();
 	}
 
@@ -2765,6 +2771,30 @@
 				'<p class="ce-hint">Deixe em branco para manter a chave atual.' +
 				(s.has_key[prov] ? ' <a href="#" data-clearkey="' + prov + '">Remover chave salva</a>' : '') + '</p></div>';
 		}
+		var aiKeys = ['anthropic', 'openai', 'gemini', 'groq'];
+		var provMeta = CE61.aiProviders || {};
+		var roleLabels = CE61.aiRoles || {};
+		var rp = s.role_provider || {};
+		function mainProvOpts() {
+			return Object.keys(provMeta).map(function (p) {
+				return '<option value="' + p + '"' + (s.provider === p ? ' selected' : '') + '>' + esc(provMeta[p].name) + '</option>';
+			}).join('');
+		}
+		function provOpts(role, selected, withDefault) {
+			var html = withDefault ? '<option value=""' + (!selected ? ' selected' : '') + '>Padrão (provedor principal)</option>' : '';
+			Object.keys(provMeta).forEach(function (p) {
+				if (provMeta[p].roles.indexOf(role) === -1) return;
+				html += '<option value="' + p + '"' + (selected === p ? ' selected' : '') + '>' + esc(provMeta[p].name) + '</option>';
+			});
+			return html;
+		}
+		function roleRow(role, hint) {
+			var isImage = role === 'image';
+			var sel = isImage ? (s.image_provider || 'openai') : (rp[role] || '');
+			return '<div class="ce-field"><label>' + esc(roleLabels[role] || role) + '</label>' +
+				'<select class="ce-select" data-roleprov="' + role + '">' + provOpts(role, sel, !isImage) + '</select>' +
+				(hint ? '<p class="ce-hint">' + hint + '</p>' : '') + '</div>';
+		}
 		el.innerHTML =
 			'<div class="ce-grid" style="grid-template-columns:1fr 1fr;align-items:start">' +
 			'<div class="ce-card">' +
@@ -2777,16 +2807,19 @@
 				'<div class="ce-field"><label>Meses até considerar desatualizado</label><input class="ce-input" id="ce-stale" type="number" value="' + s.stale_months + '"></div>' +
 			'</div>' +
 			'<div class="ce-card">' +
-				'<h2 class="ce-h2">Provedor de IA</h2><p class="ce-sub">Suas chaves ficam salvas apenas no seu banco de dados. Se o provedor selecionado não tiver chave, o plugin usa automaticamente outro que tenha.</p>' +
-				'<div class="ce-field"><label>Provedor ativo</label><select class="ce-select" id="ce-provider">' +
-					'<option value="anthropic"' + (s.provider === 'anthropic' ? ' selected' : '') + '>Anthropic (Claude)</option>' +
-					'<option value="openai"' + (s.provider === 'openai' ? ' selected' : '') + '>OpenAI (GPT)</option>' +
-					'<option value="gemini"' + (s.provider === 'gemini' ? ' selected' : '') + '>Google (Gemini)</option>' +
-				'</select></div>' +
+				'<h2 class="ce-h2">Provedor de IA</h2><p class="ce-sub">Suas chaves ficam salvas apenas no seu banco de dados. Defina um provedor principal e, se quiser, um provedor específico para cada tipo de tarefa. Se o escolhido não tiver chave, o plugin usa automaticamente outro compatível que tenha.</p>' +
+				'<div class="ce-field"><label>Provedor principal</label><select class="ce-select" id="ce-provider">' + mainProvOpts() + '</select><p class="ce-hint">Usado como padrão e como fallback dos papéis abaixo.</p></div>' +
 				keyField('anthropic', 'Chave Anthropic') +
 				keyField('openai', 'Chave OpenAI') +
 				keyField('gemini', 'Chave Gemini') +
-				'<div class="ce-field"><label>Modelo (opcional)</label><input class="ce-input" id="ce-model" value="' + esc(s.model_light) + '" placeholder="Vazio = padrão do provedor"></div>' +
+				keyField('groq', 'Chave Groq') +
+				'<h2 class="ce-h2" style="margin-top:22px">Atuação por tarefa</h2>' +
+				'<p class="ce-sub">Escolha qual provedor cuida de cada tipo de tarefa. “Imagens” fica em sincronia com a página Imagens.</p>' +
+				roleRow('text', 'Reescritas, artigos, FAQ, âncoras e campos de CPT.') +
+				roleRow('analysis', 'Resumos executivos, sugestão/planejamento de clusters e keyword foco.') +
+				roleRow('diagnosis', 'Insight de performance e atualização de posts antigos.') +
+				roleRow('image', 'Provedor de geração de imagem (OpenAI ou Google).') +
+				'<div class="ce-field"><label>Modelo de texto (opcional)</label><input class="ce-input" id="ce-model" value="' + esc(s.model_light) + '" placeholder="Vazio = padrão do provedor"><p class="ce-hint">Aplica-se à geração de texto no provedor principal.</p></div>' +
 				'<div class="ce-field"><label>Prompt global do site (identidade)</label>' +
 				'<textarea class="ce-textarea" id="ce-global">' + esc(s.global_prompt) + '</textarea>' +
 				'<p class="ce-hint">Injetado como instrução de sistema em toda ação de IA. Aceita variáveis como {{site_name}}.</p></div>' +
@@ -2844,7 +2877,16 @@
 				min_words: $('#ce-min-words').value,
 				stale_months: $('#ce-stale').value
 			};
-			['anthropic', 'openai', 'gemini'].forEach(function (p) {
+			var roleProv = {};
+			$$('[data-roleprov]', el).forEach(function (sel) {
+				if (sel.dataset.roleprov === 'image') {
+					settings.image_provider = sel.value;
+				} else {
+					roleProv[sel.dataset.roleprov] = sel.value;
+				}
+			});
+			settings.role_provider = roleProv;
+			aiKeys.forEach(function (p) {
 				var input = $('#ce-key-' + p);
 				var v = input.value.trim();
 				if (input.dataset.clear === '1' && !v) {
@@ -2857,7 +2899,9 @@
 			api('save_settings', { settings: settings }).then(function () {
 				toast('Configurações salvas');
 				CE61.settings.provider = settings.provider;
-				['anthropic', 'openai', 'gemini'].forEach(function (p) {
+				CE61.settings.role_provider = roleProv;
+				if (settings.image_provider) { CE61.settings.image_provider = settings.image_provider; }
+				aiKeys.forEach(function (p) {
 					if (settings['api_key_' + p] === '__CLEAR__') {
 						CE61.settings.has_key[p] = false;
 					} else if (settings['api_key_' + p]) {
@@ -4334,6 +4378,304 @@
 				});
 			}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
 		}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
+	}
+
+	/* ---------- Categorias: organizar posts ---------- */
+	function renderCategoriesOrganize() {
+		var el = $('#ce-panel-categories_organize');
+		el.innerHTML = '<div class="ce-loading">Carregando posts</div>';
+		api('categories_review_posts', { limit: 40, offset: 0 }).then(function (d) {
+			if (!d.posts.length) {
+				el.innerHTML = '<div class="ce-empty"><h3>Nenhum post encontrado</h3><p>Não há posts nos tipos configurados para organizar.</p></div>';
+				return;
+			}
+			el.innerHTML =
+				'<div class="ce-section">' +
+					'<h2 class="ce-h2">Organizar posts em categorias</h2>' +
+					'<p class="ce-sub">A IA lê cada post e sugere a categoria que faz mais sentido. Nada é alterado sem a sua aprovação; ao aplicar, a sugestão vira a categoria primária mantendo as demais, e um 301 é criado se a URL mudar.</p>' +
+					'<p><button class="ce-btn ce-btn-sm ce-btn-primary" id="ce-cat-analyze-all">✦ Analisar todos</button> <span class="ce-hint">' + d.total + ' post(s) no total</span></p>' +
+					'<div class="ce-table-wrap"><table class="ce-table" id="ce-cat-table"><thead><tr>' +
+						'<th>Post</th><th>Categorias atuais</th><th>Sugestão da IA</th><th></th>' +
+					'</tr></thead><tbody>' +
+						d.posts.map(catRow).join('') +
+					'</tbody></table></div>' +
+				'</div>';
+			bindCatOrganize(el);
+		}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
+	}
+
+	function catRow(p) {
+		var cur = (p.categories || []).map(function (c) { return '<span class="ce-chip">' + esc(c.name) + '</span>'; }).join(' ') || '<span class="ce-hint">—</span>';
+		return '<tr data-post="' + p.id + '">' +
+			'<td><a href="' + esc(p.edit) + '" target="_blank" rel="noopener">' + esc(p.title) + '</a></td>' +
+			'<td>' + cur + '</td>' +
+			'<td class="ce-cat-suggestion"><span class="ce-hint">não analisado</span></td>' +
+			'<td><button class="ce-btn ce-btn-sm" data-cat-analyze="' + p.id + '">Analisar</button></td>' +
+		'</tr>';
+	}
+
+	function bindCatOrganize(scope) {
+		$$('[data-cat-analyze]', scope).forEach(function (b) { b.addEventListener('click', function () { analyzeOne(b.dataset.catAnalyze); }); });
+		var all = $('#ce-cat-analyze-all', scope);
+		if (all) {
+			all.addEventListener('click', function () {
+				if (!requireKey()) { return; }
+				var btns = $$('[data-cat-analyze]', scope);
+				all.disabled = true;
+				(function next(i) {
+					if (i >= btns.length) { all.disabled = false; toast('Análise concluída'); return; }
+					analyzeOne(btns[i].dataset.catAnalyze).then(function () { next(i + 1); }).catch(function () { next(i + 1); });
+				})(0);
+			});
+		}
+	}
+
+	function analyzeOne(postId) {
+		if (!requireKey()) { return Promise.reject(new Error('sem chave')); }
+		var row = $('tr[data-post="' + postId + '"]');
+		if (!row) { return Promise.reject(new Error('linha ausente')); }
+		var cell = $('.ce-cat-suggestion', row);
+		var btn = $('[data-cat-analyze]', row);
+		cell.innerHTML = '<span class="ce-hint">analisando…</span>';
+		if (btn) { btn.disabled = true; }
+		return api('category_analyze_post', { post_id: postId }).then(function (r) {
+			if (btn) { btn.disabled = false; }
+			if (r.already) {
+				cell.innerHTML = '<span class="ce-chip ce-chip-kw">' + esc(r.suggestion) + '</span> <span class="ce-hint">já é a primária</span>';
+				return;
+			}
+			var conf = r.confidence != null ? Math.round(r.confidence * 100) + '%' : '';
+			cell.innerHTML =
+				'<span class="ce-chip ' + (r.is_new ? '' : 'ce-chip-kw') + '">' + esc(r.suggestion) + '</span>' +
+				(r.is_new ? ' <span class="ce-chip">nova</span>' : '') +
+				(conf ? ' <span class="ce-hint">' + conf + '</span>' : '') +
+				(r.reason ? '<br><span class="ce-hint">' + esc(r.reason) + '</span>' : '');
+			var act = $('[data-cat-analyze]', row).parentNode;
+			act.innerHTML = '<button class="ce-btn ce-btn-sm ce-btn-primary" data-cat-apply="' + postId + '" data-cat-name="' + esc(r.suggestion) + '" data-cat-new="' + (r.is_new ? '1' : '0') + '">Aplicar</button>';
+			$('[data-cat-apply]', row).addEventListener('click', function () { applyOne(this, row); });
+		}).catch(function (e) {
+			if (btn) { btn.disabled = false; }
+			cell.innerHTML = '<span class="ce-hint">' + esc(e.message) + '</span>';
+			throw e;
+		});
+	}
+
+	function applyOne(btn, row) {
+		btn.disabled = true;
+		api('category_apply', { post_id: btn.dataset.catApply, category: btn.dataset.catName, is_new: btn.dataset.catNew }).then(function (r) {
+			toast('Categoria aplicada' + (r.redirect ? ' + redirect 301' : ''));
+			btn.outerHTML = '<span class="ce-chip ce-chip-kw">✓ aplicada</span>';
+		}).catch(function (e) { btn.disabled = false; toast(e.message, true); });
+	}
+
+	/* ---------- Categorias: SEO & imagens ---------- */
+	function renderCategoriesSeo() {
+		var el = $('#ce-panel-categories_seo');
+		el.innerHTML = '<div class="ce-loading">Carregando categorias</div>';
+		api('categories_list', {}).then(function (d) {
+			if (!d.categories.length) {
+				el.innerHTML = '<div class="ce-empty"><h3>Nenhuma categoria</h3><p>Crie categorias na aba <b>Sugerir categorias</b> ou no WordPress.</p></div>';
+				return;
+			}
+			el.innerHTML =
+				'<div class="ce-section">' +
+					'<h2 class="ce-h2">SEO e imagens das categorias</h2>' +
+					'<p class="ce-sub">Popule título, descrição de SEO, descrição nativa e imagem de capa de cada categoria. O SEO é gravado no local que o seu plugin de SEO ativo lê.</p>' +
+					'<div class="ce-grid" style="grid-template-columns:repeat(auto-fill,minmax(360px,1fr))">' +
+						d.categories.map(catSeoCard).join('') +
+					'</div>' +
+				'</div>';
+			bindCatSeo(el);
+		}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
+	}
+
+	function catSeoCard(c) {
+		var img = c.image_url
+			? '<img src="' + esc(c.image_url) + '" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px">'
+			: '<div class="ce-hint" style="height:120px;display:flex;align-items:center;justify-content:center;background:var(--ce-surface-2,#f4f4f5);border-radius:8px;margin-bottom:8px">sem imagem</div>';
+		return '<div class="ce-card" data-term="' + c.id + '">' +
+			img +
+			'<h3 style="font-family:var(--ce-display);margin:0 0 2px">' + esc(c.name) + '</h3>' +
+			'<p class="ce-sub" style="margin:0 0 8px"><code>' + esc(c.slug) + '</code> · ' + c.count + ' post(s)</p>' +
+			'<div class="ce-field" style="margin:0 0 6px"><label>Título SEO</label><input class="ce-input" data-seo-title value="' + esc(c.seo_title || '') + '"></div>' +
+			'<div class="ce-field" style="margin:0 0 6px"><label>Descrição SEO</label><textarea class="ce-textarea" data-seo-desc style="min-height:60px">' + esc(c.seo_desc || '') + '</textarea></div>' +
+			'<div class="ce-field" style="margin:0 0 8px"><label>Descrição nativa</label><textarea class="ce-textarea" data-seo-native style="min-height:60px">' + esc(c.description || '') + '</textarea></div>' +
+			'<p style="margin:0;display:flex;gap:6px;flex-wrap:wrap">' +
+				'<button class="ce-btn ce-btn-sm ce-btn-primary" data-seo-gen="' + c.id + '">✦ Gerar SEO</button>' +
+				'<button class="ce-btn ce-btn-sm" data-seo-save="' + c.id + '">Salvar</button>' +
+				'<button class="ce-btn ce-btn-sm" data-seo-img="' + c.id + '">✦ Gerar imagem</button>' +
+			'</p>' +
+		'</div>';
+	}
+
+	function bindCatSeo(scope) {
+		$$('[data-seo-gen]', scope).forEach(function (b) {
+			b.addEventListener('click', function () {
+				if (!requireKey()) { return; }
+				var card = b.closest('.ce-card');
+				b.disabled = true; b.textContent = 'Gerando…';
+				api('category_generate_seo', { term_id: b.dataset.seoGen }).then(function (r) {
+					b.disabled = false; b.textContent = '✦ Gerar SEO';
+					$('[data-seo-title]', card).value = r.title || '';
+					$('[data-seo-desc]', card).value = r.desc || '';
+					$('[data-seo-native]', card).value = r.native_description || '';
+					card._imgPrompt = r.image_prompt || '';
+					toast('SEO gerado');
+				}).catch(function (e) { b.disabled = false; b.textContent = '✦ Gerar SEO'; toast(e.message, true); });
+			});
+		});
+		$$('[data-seo-save]', scope).forEach(function (b) {
+			b.addEventListener('click', function () {
+				var card = b.closest('.ce-card');
+				b.disabled = true;
+				api('category_save_seo', {
+					term_id: b.dataset.seoSave,
+					title: $('[data-seo-title]', card).value,
+					desc: $('[data-seo-desc]', card).value,
+					native: $('[data-seo-native]', card).value
+				}).then(function () { b.disabled = false; toast('SEO salvo'); })
+					.catch(function (e) { b.disabled = false; toast(e.message, true); });
+			});
+		});
+		$$('[data-seo-img]', scope).forEach(function (b) {
+			b.addEventListener('click', function () {
+				if (!requireKey()) { return; }
+				var card = b.closest('.ce-card');
+				b.disabled = true; b.textContent = 'Gerando…';
+				api('category_generate_image', { term_id: b.dataset.seoImg, prompt: card._imgPrompt || '' }).then(function (r) {
+					b.disabled = false; b.textContent = '✦ Gerar imagem';
+					var existing = $('img', card);
+					if (existing) { existing.src = r.image_url; }
+					else { card.insertAdjacentHTML('afterbegin', '<img src="' + esc(r.image_url) + '" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:8px">'); }
+					toast('Imagem gerada');
+				}).catch(function (e) { b.disabled = false; b.textContent = '✦ Gerar imagem'; toast(e.message, true); });
+			});
+		});
+	}
+
+	/* ---------- Categorias: sugerir novas ---------- */
+	function renderCategoriesSuggest() {
+		var el = $('#ce-panel-categories_suggest');
+		el.innerHTML =
+			'<div class="ce-section">' +
+				'<h2 class="ce-h2">Sugerir novas categorias</h2>' +
+				'<p class="ce-sub">A IA analisa o conteúdo do site e propõe categorias que fariam sentido para organizar melhor os posts.</p>' +
+				'<p><button class="ce-btn ce-btn-primary" id="ce-cat-suggest-go">✦ Sugerir categorias</button></p>' +
+				'<div id="ce-cat-suggest-out"></div>' +
+			'</div>';
+		$('#ce-cat-suggest-go').addEventListener('click', function () {
+			if (!requireKey()) { return; }
+			var btn = this, out = $('#ce-cat-suggest-out');
+			btn.disabled = true;
+			out.innerHTML = '<div class="ce-loading">Analisando o site e gerando sugestões</div>';
+			api('categories_suggest', { count: 6 }).then(function (d) {
+				btn.disabled = false;
+				if (!d.suggestions.length) { out.innerHTML = '<div class="ce-empty"><p>Nenhuma sugestão gerada.</p></div>'; return; }
+				out.innerHTML = '<div class="ce-grid" style="grid-template-columns:repeat(auto-fill,minmax(320px,1fr))">' +
+					d.suggestions.map(catSuggestCard).join('') + '</div>';
+				bindCatSuggest(out);
+			}).catch(function (e) { btn.disabled = false; out.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
+		});
+	}
+
+	function catSuggestCard(s) {
+		return '<div class="ce-card">' +
+			'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">' +
+				'<h3 style="font-family:var(--ce-display);margin:0">' + esc(s.name) + '</h3>' +
+				(s.exists ? '<span class="ce-chip">já existe</span>' : '') +
+			'</div>' +
+			(s.keyword ? '<p class="ce-sub" style="margin:4px 0 0">foco: <code>' + esc(s.keyword) + '</code></p>' : '') +
+			(s.description ? '<p class="ce-sub" style="margin:6px 0 0">' + esc(s.description) + '</p>' : '') +
+			(s.rationale ? '<p class="ce-hint" style="margin:6px 0 0">' + esc(s.rationale) + '</p>' : '') +
+			'<p style="margin:12px 0 0">' +
+				(s.exists ? '<span class="ce-hint">categoria já existente</span>' :
+					'<button class="ce-btn ce-btn-sm ce-btn-primary" data-cat-create="' + esc(s.name) + '" data-cat-desc="' + esc(s.description || '') + '">+ Criar categoria</button>') +
+			'</p>' +
+		'</div>';
+	}
+
+	function bindCatSuggest(scope) {
+		$$('[data-cat-create]', scope).forEach(function (b) {
+			b.addEventListener('click', function () {
+				b.disabled = true;
+				api('category_create', { name: b.dataset.catCreate, description: b.dataset.catDesc }).then(function () {
+					toast('Categoria criada');
+					b.outerHTML = '<span class="ce-chip ce-chip-kw">✓ criada</span>';
+				}).catch(function (e) { b.disabled = false; toast(e.message, true); });
+			});
+		});
+	}
+
+	/* ---------- Categorias: redirects 301 ---------- */
+	function renderCategoriesRedirects() {
+		var el = $('#ce-panel-categories_redirects');
+		el.innerHTML = '<div class="ce-loading">Carregando redirects</div>';
+		api('redirects_list', {}).then(function (d) {
+			var badge = d.rankmath
+				? '<span class="ce-chip ce-chip-kw">integrado ao Rank Math</span>'
+				: '<span class="ce-chip">armazenamento próprio (Rank Math inativo)</span>';
+			var rows = d.redirects.length
+				? d.redirects.map(redirectRow).join('')
+				: '<tr><td colspan="6"><span class="ce-hint">nenhum redirect cadastrado</span></td></tr>';
+			el.innerHTML =
+				'<div class="ce-section">' +
+					'<h2 class="ce-h2">Redirects 301 ' + badge + '</h2>' +
+					'<p class="ce-sub">Gerencie os redirecionamentos do site. Quando o Rank Math está ativo, leem-se e gravam-se os mesmos redirects do módulo nativo dele.</p>' +
+					'<div class="ce-card" style="margin-bottom:14px">' +
+						'<div class="ce-grid" style="grid-template-columns:2fr 2fr 1fr auto;gap:8px;align-items:end">' +
+							'<div class="ce-field" style="margin:0"><label>De (origem)</label><input class="ce-input" id="ce-rd-from" placeholder="/categoria/antiga/post"></div>' +
+							'<div class="ce-field" style="margin:0"><label>Para (destino)</label><input class="ce-input" id="ce-rd-to" placeholder="/categoria/nova/post"></div>' +
+							'<div class="ce-field" style="margin:0"><label>Código</label><select class="ce-select" id="ce-rd-code"><option value="301">301</option><option value="302">302</option><option value="307">307</option><option value="410">410</option><option value="451">451</option></select></div>' +
+							'<div class="ce-field" style="margin:0"><button class="ce-btn ce-btn-primary" id="ce-rd-add">+ Adicionar</button></div>' +
+						'</div>' +
+					'</div>' +
+					'<div class="ce-table-wrap"><table class="ce-table" id="ce-rd-table"><thead><tr>' +
+						'<th>De</th><th>Para</th><th>Código</th><th>Hits</th><th>Status</th><th></th>' +
+					'</tr></thead><tbody>' + rows + '</tbody></table></div>' +
+				'</div>';
+			bindRedirects(el);
+		}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
+	}
+
+	function redirectRow(r) {
+		return '<tr data-rd="' + r.id + '">' +
+			'<td><code>' + esc(r.from) + '</code></td>' +
+			'<td><code>' + esc(r.to) + '</code></td>' +
+			'<td>' + r.code + '</td>' +
+			'<td>' + r.hits + '</td>' +
+			'<td><button class="ce-btn ce-btn-sm" data-rd-toggle="' + r.id + '">' + (r.status === 'active' ? 'ativo' : 'inativo') + '</button></td>' +
+			'<td><button class="ce-btn ce-btn-sm" data-rd-del="' + r.id + '">Excluir</button></td>' +
+		'</tr>';
+	}
+
+	function bindRedirects(scope) {
+		$('#ce-rd-add', scope).addEventListener('click', function () {
+			var from = $('#ce-rd-from').value.trim(), to = $('#ce-rd-to').value.trim();
+			if (!from || !to) { toast('Preencha origem e destino', true); return; }
+			this.disabled = true;
+			api('redirect_add', { from: from, to: to, code: $('#ce-rd-code').value }).then(function () {
+				toast('Redirect adicionado');
+				loadPanel('categories_redirects', true);
+			}).catch(function (e) { toast(e.message, true); $('#ce-rd-add').disabled = false; });
+		});
+		$$('[data-rd-del]', scope).forEach(function (b) {
+			b.addEventListener('click', function () {
+				b.disabled = true;
+				api('redirect_delete', { id: b.dataset.rdDel }).then(function () {
+					toast('Redirect excluído');
+					var tr = b.closest('tr'); if (tr) { tr.remove(); }
+				}).catch(function (e) { b.disabled = false; toast(e.message, true); });
+			});
+		});
+		$$('[data-rd-toggle]', scope).forEach(function (b) {
+			b.addEventListener('click', function () {
+				b.disabled = true;
+				api('redirect_toggle', { id: b.dataset.rdToggle }).then(function (r) {
+					b.disabled = false;
+					b.textContent = r.status === 'active' ? 'ativo' : 'inativo';
+				}).catch(function (e) { b.disabled = false; toast(e.message, true); });
+			});
+		});
 	}
 
 	/* ---------- Boot ---------- */

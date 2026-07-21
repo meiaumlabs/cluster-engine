@@ -84,6 +84,18 @@ class CE61_AI {
 				'label'  => 'Sugerir novos clusters (com base no site)',
 				'prompt' => "Você é um estrategista de conteúdo. Analise o contexto abaixo, entenda do que trata o site e sugira {{count}} NOVOS clusters de conteúdo que ampliem a autoridade tópica sem duplicar os clusters existentes. Cada sugestão deve ser um tema coerente com o negócio e o público do site.\n\nCONTEXTO DO SITE:\n{{site_context}}\n\nResponda APENAS com um array JSON válido, sem markdown e sem texto ao redor, no formato:\n[{\"name\":\"Nome do cluster (2-4 palavras)\",\"description\":\"1 frase sobre o que o cluster cobre\",\"keyword\":\"keyword principal do pilar\",\"rationale\":\"por que faz sentido para este site\"}]",
 			),
+			'categorize_post' => array(
+				'label'  => 'Classificar post na melhor categoria',
+				'prompt' => "Você é um editor que organiza a taxonomia do site {{site_name}}. Leia o post abaixo e escolha a categoria que MELHOR representa o assunto principal dele.\n\nCATEGORIAS EXISTENTES (nome — descrição):\n{{categories_list}}\n\nTÍTULO: {{title}}\nKEYWORD FOCO: {{keyword}}\nCATEGORIAS ATUAIS DO POST: {{current_categories}}\nRESUMO/CONTEÚDO:\n{{excerpt}}\n\nRegras: prefira SEMPRE uma categoria existente da lista. Só proponha uma categoria nova (campo \"is_new\": true) quando nenhuma existente for minimamente adequada; nesse caso o nome deve ser curto (1 a 3 palavras) e genérico o suficiente para agrupar outros posts. Não invente subcategorias hiperespecíficas.\n\nResponda APENAS com um objeto JSON válido, sem markdown e sem texto ao redor, no formato: {\"category\":\"Nome da categoria\",\"is_new\":false,\"confidence\":0.0,\"reason\":\"1 frase curta\"}",
+			),
+			'suggest_categories' => array(
+				'label'  => 'Sugerir novas categorias',
+				'prompt' => "Você é um estrategista de taxonomia de conteúdo. Analise o contexto do site {{site_name}} e sugira {{count}} NOVAS categorias que organizem melhor o conteúdo e ampliem a autoridade tópica, SEM duplicar as categorias existentes.\n\nCATEGORIAS EXISTENTES:\n{{categories_list}}\n\nCONTEXTO DO SITE (títulos e temas):\n{{site_context}}\n\nCada categoria deve ser um agrupamento amplo e coerente (não um assunto de um único post). Responda APENAS com um array JSON válido, sem markdown e sem texto ao redor, no formato:\n[{\"name\":\"Nome da categoria (1-3 palavras)\",\"description\":\"1 frase sobre o que agrupa\",\"keyword\":\"keyword principal\",\"rationale\":\"por que faz sentido para este site\"}]",
+			),
+			'category_seo' => array(
+				'label'  => 'Gerar SEO e imagem da categoria',
+				'prompt' => "Você vai preencher o SEO da página de arquivo da categoria \"{{category_name}}\" do site {{site_name}}. Use como base os posts que já pertencem a ela.\n\nPOSTS DA CATEGORIA (amostra de títulos):\n{{category_posts}}\n\nGere: 1) meta title de até 60 caracteres com a keyword da categoria no início; 2) meta description de 140 a 156 caracteres, natural, terminando com um chamado à ação sutil; 3) uma descrição nativa da categoria com 2 a 3 frases (aparece na página de arquivo em muitos temas), informativa e sem clickbait; 4) um prompt em inglês para gerar uma imagem de capa da categoria, coerente com o tema, estilo editorial limpo, sem texto na imagem. NÃO use travessão nem emojis.\n\nResponda APENAS com um objeto JSON válido, sem markdown e sem texto ao redor, no formato: {\"title\":\"...\",\"description\":\"...\",\"native_description\":\"...\",\"image_prompt\":\"...\"}",
+			),
 			'plan_cluster_content' => array(
 				'label'  => 'Planejar conteúdo de um cluster (com briefing)',
 				'prompt' => "Você é um estrategista de conteúdo e um editor experiente. Planeje {{count}} artigos para o cluster \"{{cluster_name}}\" ({{cluster_description}}) do site descrito abaixo. Os artigos devem cobrir o tema de forma complementar, SEM repetir os posts que o cluster já tem, e alinhados à intenção de busca real do público.\n\nSe o cluster ainda não tem um post pilar, o primeiro item deve ser o pilar (guia completo do tema); os demais são satélites.\n\nProfundidade alvo desta leva: cada artigo deve mirar aproximadamente {{word_count_target}} palavras e {{h2_count_target}} subtítulos H2, ajustando um pouco para cima ou para baixo conforme o que o subtema realmente exigir.\n\nPara CADA artigo, além do título e keyword, monte um briefing editorial curto baseado no que você sabe sobre o assunto (não é busca ao vivo, é síntese do seu conhecimento): liste de 3 a 5 perguntas frequentes que o público realmente faz sobre esse tópico específico, e de 3 a 6 subtemas/pontos-chave que o artigo precisa cobrir para ser completo.\n\nCONTEXTO DO SITE:\n{{site_context}}\n\nPOSTS QUE O CLUSTER JÁ TEM:\n{{cluster_posts}}\n\nResponda APENAS com um array JSON válido, sem markdown e sem texto ao redor, no formato:\n[{\"title\":\"Título do artigo\",\"keyword\":\"keyword foco em minúsculas\",\"type\":\"pillar ou satellite\",\"word_count\":1200,\"h2_count\":6,\"faqs\":[\"Pergunta 1?\",\"Pergunta 2?\"],\"subtopics\":[\"Subtema 1\",\"Subtema 2\"]}]",
@@ -178,25 +190,77 @@ class CE61_AI {
 		$system = self::resolve_vars( isset( $settings['global_prompt'] ) ? $settings['global_prompt'] : '', $post_id, $extra );
 		$user   = self::resolve_vars( $prompts[ $action ]['prompt'], $post_id, $extra );
 
-		return self::complete( $system, $user, $settings );
+		return self::complete( $system, $user, $settings, self::action_role( $action ) );
 	}
 
 	/**
-	 * Effective provider: the selected one if it has a key; otherwise the
-	 * first provider that does have a key. Prevents misconfiguration errors.
+	 * Papéis (tarefas) em que um provedor pode atuar. O usuário escolhe, em
+	 * Configurações, qual provedor cuida de cada papel; imagens continuam
+	 * governadas por 'image_provider' (página Imagens).
 	 */
-	public static function effective_provider( $settings ) {
-		$pref = isset( $settings['provider'] ) ? $settings['provider'] : 'anthropic';
-		$keys = array(
-			'anthropic' => ! empty( $settings['api_key_anthropic'] ),
-			'openai'    => ! empty( $settings['api_key_openai'] ),
-			'gemini'    => ! empty( $settings['api_key_gemini'] ),
+	public static function roles() {
+		return array(
+			'text'      => __( 'Geração de texto', 'cluster-engine' ),
+			'analysis'  => __( 'Análise', 'cluster-engine' ),
+			'diagnosis' => __( 'Diagnóstico', 'cluster-engine' ),
+			'image'     => __( 'Imagens', 'cluster-engine' ),
 		);
-		if ( ! empty( $keys[ $pref ] ) ) {
+	}
+
+	/**
+	 * Metadados de cada provedor: rótulo e papéis suportados. Groq é
+	 * compatível com a API da OpenAI (só texto — não gera imagens).
+	 */
+	public static function providers_meta() {
+		return array(
+			'anthropic' => array( 'name' => 'Anthropic (Claude)', 'roles' => array( 'text', 'analysis', 'diagnosis' ) ),
+			'openai'    => array( 'name' => 'OpenAI (GPT)',       'roles' => array( 'text', 'analysis', 'diagnosis', 'image' ) ),
+			'gemini'    => array( 'name' => 'Google (Gemini)',    'roles' => array( 'text', 'analysis', 'diagnosis', 'image' ) ),
+			'groq'      => array( 'name' => 'Groq (Llama/Mixtral)', 'roles' => array( 'text', 'analysis', 'diagnosis' ) ),
+		);
+	}
+
+	/**
+	 * Papel de uma ação de IA — decide qual provedor por-papel será usado.
+	 * Tudo que não estiver mapeado é considerado geração de texto.
+	 */
+	public static function action_role( $action ) {
+		$map = array(
+			'performance_insight'  => 'diagnosis',
+			'refresh_post'         => 'diagnosis',
+			'exec_summary'         => 'analysis',
+			'suggest_clusters'     => 'analysis',
+			'plan_cluster_content' => 'analysis',
+			'name_cluster'         => 'analysis',
+			'suggest_keyword'      => 'analysis',
+			'categorize_post'      => 'analysis',
+			'suggest_categories'   => 'analysis',
+			'category_seo'         => 'analysis',
+		);
+		return isset( $map[ $action ] ) ? $map[ $action ] : 'text';
+	}
+
+	/**
+	 * Provedor efetivo para um papel: a escolha por-papel (ou o provedor
+	 * principal) se for compatível com o papel E tiver chave; caso contrário,
+	 * o primeiro provedor compatível que tenha chave. Evita erros de config.
+	 */
+	public static function effective_provider( $settings, $role = 'text' ) {
+		$meta = self::providers_meta();
+		$rp   = isset( $settings['role_provider'] ) && is_array( $settings['role_provider'] ) ? $settings['role_provider'] : array();
+		$main = isset( $settings['provider'] ) ? $settings['provider'] : 'anthropic';
+		$pref = ! empty( $rp[ $role ] ) ? $rp[ $role ] : $main;
+
+		$usable = function ( $p ) use ( $meta, $settings, $role ) {
+			return isset( $meta[ $p ] )
+				&& in_array( $role, $meta[ $p ]['roles'], true )
+				&& ! empty( $settings[ 'api_key_' . $p ] );
+		};
+		if ( $usable( $pref ) ) {
 			return $pref;
 		}
-		foreach ( $keys as $p => $has ) {
-			if ( $has ) {
+		foreach ( $meta as $p => $info ) {
+			if ( $usable( $p ) ) {
 				return $p;
 			}
 		}
@@ -204,11 +268,11 @@ class CE61_AI {
 	}
 
 	public static function provider_names() {
-		return array(
-			'anthropic' => 'Anthropic (Claude)',
-			'openai'    => 'OpenAI (GPT)',
-			'gemini'    => 'Google (Gemini)',
-		);
+		$out = array();
+		foreach ( self::providers_meta() as $k => $m ) {
+			$out[ $k ] = $m['name'];
+		}
+		return $out;
 	}
 
 	/**
@@ -243,25 +307,32 @@ class CE61_AI {
 	/**
 	 * Provider-agnostic completion via wp_remote_post.
 	 */
-	public static function complete( $system, $user, $settings ) {
-		$preferred = isset( $settings['provider'] ) ? $settings['provider'] : 'anthropic';
-		$provider  = self::effective_provider( $settings );
+	public static function complete( $system, $user, $settings, $role = 'text' ) {
+		$main     = isset( $settings['provider'] ) ? $settings['provider'] : 'anthropic';
+		$provider = self::effective_provider( $settings, $role );
 
 		if ( '' === $provider ) {
-			return new WP_Error( 'ce61_no_key', __( 'Nenhuma chave de API configurada. Adicione a chave de pelo menos um provedor em Configurações.', 'cluster-engine' ) );
+			return new WP_Error( 'ce61_no_key', __( 'Nenhuma chave de API configurada para esta ação. Adicione a chave de um provedor compatível em Configurações.', 'cluster-engine' ) );
 		}
-		// If we fell back to a different provider, the custom model name from the
-		// preferred provider would be invalid — use the fallback provider's default.
-		$custom_model = ( $provider === $preferred && ! empty( $settings['model_light'] ) ) ? $settings['model_light'] : '';
+		// O modelo customizado (model_light) só se aplica à geração de texto e
+		// somente quando o papel usa o provedor principal — para os demais
+		// papéis/provedores usamos o modelo padrão de cada um.
+		$custom_model = ( 'text' === $role && $provider === $main && ! empty( $settings['model_light'] ) ) ? $settings['model_light'] : '';
 
 		switch ( $provider ) {
 			case 'openai':
-				$key = trim( isset( $settings['api_key_openai'] ) ? $settings['api_key_openai'] : '' );
+			case 'groq':
+				$is_groq = ( 'groq' === $provider );
+				$key_f   = $is_groq ? 'api_key_groq' : 'api_key_openai';
+				$key     = trim( isset( $settings[ $key_f ] ) ? $settings[ $key_f ] : '' );
 				if ( ! $key ) {
-					return new WP_Error( 'ce61_no_key', __( 'Configure a chave de API da OpenAI em Configurações.', 'cluster-engine' ) );
+					return new WP_Error( 'ce61_no_key', $is_groq
+						? __( 'Configure a chave de API da Groq em Configurações.', 'cluster-engine' )
+						: __( 'Configure a chave de API da OpenAI em Configurações.', 'cluster-engine' ) );
 				}
-				$model = $custom_model ? $custom_model : 'gpt-4o-mini';
-				$res   = wp_remote_post( 'https://api.openai.com/v1/chat/completions', array(
+				$endpoint = $is_groq ? 'https://api.groq.com/openai/v1/chat/completions' : 'https://api.openai.com/v1/chat/completions';
+				$model    = $custom_model ? $custom_model : ( $is_groq ? 'llama-3.3-70b-versatile' : 'gpt-4o-mini' );
+				$res      = wp_remote_post( $endpoint, array(
 					'timeout' => 90,
 					'headers' => array(
 						'Authorization' => 'Bearer ' . $key,
@@ -284,7 +355,9 @@ class CE61_AI {
 				if ( isset( $body['choices'][0]['message']['content'] ) ) {
 					return trim( $body['choices'][0]['message']['content'] );
 				}
-				return self::api_error( $code, $body, __( 'Resposta inesperada da OpenAI.', 'cluster-engine' ) );
+				return self::api_error( $code, $body, $is_groq
+					? __( 'Resposta inesperada da Groq.', 'cluster-engine' )
+					: __( 'Resposta inesperada da OpenAI.', 'cluster-engine' ) );
 
 			case 'gemini':
 				$key = trim( isset( $settings['api_key_gemini'] ) ? $settings['api_key_gemini'] : '' );

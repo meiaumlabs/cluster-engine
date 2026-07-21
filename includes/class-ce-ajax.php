@@ -32,6 +32,9 @@ class CE61_Ajax {
 			'google_status', 'google_disconnect', 'google_list_sites', 'google_list_ga4', 'google_test_gsc', 'google_test_ga4',
 			'keyword_network',
 			'cpt_list', 'cpt_toggle', 'cpt_generate',
+			'categories_list', 'categories_review_posts', 'category_analyze_post', 'category_apply',
+			'categories_suggest', 'category_create', 'category_generate_seo', 'category_save_seo', 'category_generate_image',
+			'redirects_list', 'redirect_add', 'redirect_delete', 'redirect_toggle',
 		);
 		foreach ( $actions as $a ) {
 			add_action( 'wp_ajax_ce61_' . $a, array( __CLASS__, $a ) );
@@ -2811,7 +2814,7 @@ class CE61_Ajax {
 		 * quando a aba que o contém realmente o envia. Chaves de API seguem a
 		 * mesma regra e usam o sentinela '__CLEAR__' para remoção explícita.
 		 */
-		foreach ( array( 'api_key_openai', 'api_key_anthropic', 'api_key_gemini' ) as $kf ) {
+		foreach ( array( 'api_key_openai', 'api_key_anthropic', 'api_key_gemini', 'api_key_groq' ) as $kf ) {
 			if ( ! isset( $in[ $kf ] ) ) {
 				continue; // não enviada: mantém a atual.
 			}
@@ -2821,6 +2824,14 @@ class CE61_Ajax {
 			} elseif ( '' !== $val ) {
 				$cur[ $kf ] = $val;
 			}
+		}
+		// Provedor por papel (texto/análise/diagnóstico). Vazio = usa o principal.
+		if ( isset( $in['role_provider'] ) && is_array( $in['role_provider'] ) ) {
+			$rp = isset( $cur['role_provider'] ) && is_array( $cur['role_provider'] ) ? $cur['role_provider'] : array();
+			foreach ( $in['role_provider'] as $r => $p ) {
+				$rp[ sanitize_key( $r ) ] = sanitize_key( $p );
+			}
+			$cur['role_provider'] = $rp;
 		}
 		$text_fields = array(
 			'model_light'     => '',
@@ -2998,5 +3009,148 @@ class CE61_Ajax {
 			update_option( 'ce61_prompts', $saved );
 		}
 		wp_send_json_success( array( 'prompt' => $defaults[ $key ]['prompt'] ) );
+	}
+
+	/* ---------- Category organizer ---------- */
+
+	public static function categories_list() {
+		self::guard();
+		wp_send_json_success( array( 'categories' => CE61_Categories::list_categories() ) );
+	}
+
+	public static function categories_review_posts() {
+		self::guard();
+		$limit  = isset( $_POST['limit'] ) ? absint( $_POST['limit'] ) : 30;
+		$offset = isset( $_POST['offset'] ) ? absint( $_POST['offset'] ) : 0;
+		wp_send_json_success( CE61_Categories::review_posts( $limit, $offset ) );
+	}
+
+	public static function category_analyze_post() {
+		self::guard();
+		$post_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		if ( ! $post_id ) {
+			wp_send_json_error( array( 'message' => __( 'Post inválido.', 'cluster-engine' ) ) );
+		}
+		$res = CE61_Categories::analyze_post( $post_id );
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
+		}
+		wp_send_json_success( $res );
+	}
+
+	public static function category_apply() {
+		self::guard();
+		$post_id  = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$category = isset( $_POST['category'] ) ? sanitize_text_field( wp_unslash( $_POST['category'] ) ) : '';
+		$is_new   = ! empty( $_POST['is_new'] );
+		if ( ! $post_id || '' === $category ) {
+			wp_send_json_error( array( 'message' => __( 'Dados incompletos.', 'cluster-engine' ) ) );
+		}
+		$res = CE61_Categories::apply( $post_id, $category, $is_new );
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
+		}
+		wp_send_json_success( $res );
+	}
+
+	public static function categories_suggest() {
+		self::guard();
+		$count = isset( $_POST['count'] ) ? absint( $_POST['count'] ) : 5;
+		$res   = CE61_Categories::suggest( $count );
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'suggestions' => $res ) );
+	}
+
+	public static function category_create() {
+		self::guard();
+		$name = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
+		$desc = isset( $_POST['description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['description'] ) ) : '';
+		if ( '' === $name ) {
+			wp_send_json_error( array( 'message' => __( 'Nome obrigatório.', 'cluster-engine' ) ) );
+		}
+		$res = CE61_Categories::create( $name, $desc );
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
+		}
+		wp_send_json_success( $res );
+	}
+
+	public static function category_generate_seo() {
+		self::guard();
+		$term_id = isset( $_POST['term_id'] ) ? absint( $_POST['term_id'] ) : 0;
+		if ( ! $term_id ) {
+			wp_send_json_error( array( 'message' => __( 'Categoria inválida.', 'cluster-engine' ) ) );
+		}
+		$res = CE61_Categories::generate_seo( $term_id );
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
+		}
+		wp_send_json_success( $res );
+	}
+
+	public static function category_save_seo() {
+		self::guard();
+		$term_id = isset( $_POST['term_id'] ) ? absint( $_POST['term_id'] ) : 0;
+		$title   = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
+		$desc    = isset( $_POST['desc'] ) ? sanitize_text_field( wp_unslash( $_POST['desc'] ) ) : '';
+		$native  = isset( $_POST['native'] ) ? sanitize_textarea_field( wp_unslash( $_POST['native'] ) ) : '';
+		if ( ! $term_id ) {
+			wp_send_json_error( array( 'message' => __( 'Categoria inválida.', 'cluster-engine' ) ) );
+		}
+		$res = CE61_Categories::save_seo( $term_id, $title, $desc, $native );
+		wp_send_json_success( $res );
+	}
+
+	public static function category_generate_image() {
+		self::guard();
+		$term_id = isset( $_POST['term_id'] ) ? absint( $_POST['term_id'] ) : 0;
+		$prompt  = isset( $_POST['prompt'] ) ? sanitize_textarea_field( wp_unslash( $_POST['prompt'] ) ) : '';
+		if ( ! $term_id ) {
+			wp_send_json_error( array( 'message' => __( 'Categoria inválida.', 'cluster-engine' ) ) );
+		}
+		$res = CE61_Categories::generate_image( $term_id, $prompt );
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
+		}
+		wp_send_json_success( $res );
+	}
+
+	/* ---------- Redirects (Rank Math integrado) ---------- */
+
+	public static function redirects_list() {
+		self::guard();
+		wp_send_json_success( array(
+			'redirects' => CE61_Redirects::list_all(),
+			'rankmath'  => CE61_Redirects::rankmath_active(),
+		) );
+	}
+
+	public static function redirect_add() {
+		self::guard();
+		$from = isset( $_POST['from'] ) ? esc_url_raw( wp_unslash( $_POST['from'] ) ) : '';
+		$to   = isset( $_POST['to'] ) ? esc_url_raw( wp_unslash( $_POST['to'] ) ) : '';
+		$code = isset( $_POST['code'] ) ? absint( $_POST['code'] ) : 301;
+		if ( '' === $from || '' === $to ) {
+			wp_send_json_error( array( 'message' => __( 'Origem e destino são obrigatórios.', 'cluster-engine' ) ) );
+		}
+		$res = CE61_Redirects::add( $from, $to, $code );
+		if ( is_wp_error( $res ) ) {
+			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
+		}
+		wp_send_json_success( array( 'id' => $res ) );
+	}
+
+	public static function redirect_delete() {
+		self::guard();
+		$id = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		wp_send_json_success( array( 'ok' => CE61_Redirects::delete( $id ) ) );
+	}
+
+	public static function redirect_toggle() {
+		self::guard();
+		$id = isset( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
+		wp_send_json_success( array( 'status' => CE61_Redirects::toggle( $id ) ) );
 	}
 }

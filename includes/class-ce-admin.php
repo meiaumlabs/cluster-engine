@@ -80,6 +80,14 @@ class CE61_Admin {
 					'cpt_content' => __( 'Conteúdo & clusters do CPT', 'cluster-engine' ),
 				),
 			),
+			'categories' => array(
+				'tabs' => array(
+					'categories_organize'  => __( 'Organizar posts', 'cluster-engine' ),
+					'categories_seo'       => __( 'SEO & imagens', 'cluster-engine' ),
+					'categories_suggest'   => __( 'Sugerir categorias', 'cluster-engine' ),
+					'categories_redirects' => __( 'Redirects 301', 'cluster-engine' ),
+				),
+			),
 		);
 	}
 
@@ -107,6 +115,8 @@ class CE61_Admin {
 		self::$hooks[ $hook ] = 'network';
 		$hook = add_submenu_page( 'cluster-engine', __( 'CPTs', 'cluster-engine' ), __( 'CPTs', 'cluster-engine' ), 'manage_options', 'cluster-engine-cpt', function () { self::render( 'cpt' ); } );
 		self::$hooks[ $hook ] = 'cpt';
+		$hook = add_submenu_page( 'cluster-engine', __( 'Categorias', 'cluster-engine' ), __( 'Categorias', 'cluster-engine' ), 'manage_options', 'cluster-engine-categories', function () { self::render( 'categories' ); } );
+		self::$hooks[ $hook ] = 'categories';
 	}
 
 	public static function assets( $hook ) {
@@ -139,11 +149,13 @@ class CE61_Admin {
 				'performance' => admin_url( 'admin.php?page=cluster-engine-performance' ),
 				'network'     => admin_url( 'admin.php?page=cluster-engine-network' ),
 				'cpt'         => admin_url( 'admin.php?page=cluster-engine-cpt' ),
+				'categories'  => admin_url( 'admin.php?page=cluster-engine-categories' ),
 			),
 			'prompts'  => $safe,
 			'settings' => array(
 				'post_types'   => isset( $settings['post_types'] ) ? $settings['post_types'] : array( 'post' ),
 				'provider'     => isset( $settings['provider'] ) ? $settings['provider'] : 'anthropic',
+				'role_provider' => isset( $settings['role_provider'] ) && is_array( $settings['role_provider'] ) ? $settings['role_provider'] : array(),
 				'model_light'  => isset( $settings['model_light'] ) ? $settings['model_light'] : '',
 				'global_prompt' => isset( $settings['global_prompt'] ) ? $settings['global_prompt'] : '',
 				'sim_link'     => isset( $settings['sim_link'] ) ? $settings['sim_link'] : 0.22,
@@ -183,6 +195,7 @@ class CE61_Admin {
 					'openai'    => ! empty( $settings['api_key_openai'] ),
 					'anthropic' => ! empty( $settings['api_key_anthropic'] ),
 					'gemini'    => ! empty( $settings['api_key_gemini'] ),
+					'groq'      => ! empty( $settings['api_key_groq'] ),
 					'serper'    => ! empty( $settings['serp_key_serper'] ),
 					'serpapi'   => ! empty( $settings['serp_key_serpapi'] ),
 					'valueserp' => ! empty( $settings['serp_key_valueserp'] ),
@@ -191,6 +204,8 @@ class CE61_Admin {
 					'pixabay'   => ! empty( $settings['stock_key_pixabay'] ),
 				),
 			),
+			'aiProviders'    => CE61_AI::providers_meta(),
+			'aiRoles'        => CE61_AI::roles(),
 			'stockProviders' => CE61_Stock::providers(),
 			'imageCatalog'   => CE61_Images::catalog(),
 			'imageStylePresets' => CE61_Images::style_presets(),
@@ -229,6 +244,7 @@ class CE61_Admin {
 			'performance' => __( 'Posicionamento no Google, tráfego e cliques por página', 'cluster-engine' ),
 			'network'     => __( 'Como as palavras-chave conectam seus artigos', 'cluster-engine' ),
 			'cpt'         => __( 'Integração de Custom Post Types e geração de conteúdo', 'cluster-engine' ),
+			'categories'  => __( 'Organize posts em categorias, popule SEO/imagens e gerencie redirects 301', 'cluster-engine' ),
 		);
 		?>
 		<div class="ce-app" id="ce-app">

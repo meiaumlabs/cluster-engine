@@ -94,6 +94,76 @@ class CE61_SEO {
 	}
 
 	/**
+	 * SEO de termo (categoria) — grava título/descrição no local que o
+	 * plugin de SEO ativo lê; sem plugin, usa meta próprio do Cluster Engine.
+	 * Yoast guarda meta de taxonomia numa option, não em term meta.
+	 */
+	public static function set_term_seo( $term_id, $title, $desc ) {
+		$term_id = (int) $term_id;
+		$title   = sanitize_text_field( $title );
+		$desc    = sanitize_text_field( $desc );
+		switch ( self::active_plugin() ) {
+			case 'yoast':
+				$term = get_term( $term_id );
+				if ( $term && ! is_wp_error( $term ) ) {
+					$opt = get_option( 'wpseo_taxonomy_meta', array() );
+					if ( ! isset( $opt[ $term->taxonomy ] ) ) {
+						$opt[ $term->taxonomy ] = array();
+					}
+					$opt[ $term->taxonomy ][ $term_id ]['wpseo_title'] = $title;
+					$opt[ $term->taxonomy ][ $term_id ]['wpseo_desc']  = $desc;
+					update_option( 'wpseo_taxonomy_meta', $opt );
+				}
+				break;
+			case 'rankmath':
+				update_term_meta( $term_id, 'rank_math_title', $title );
+				update_term_meta( $term_id, 'rank_math_description', $desc );
+				break;
+			case 'seopress':
+				update_term_meta( $term_id, '_seopress_titles_title', $title );
+				update_term_meta( $term_id, '_seopress_titles_desc', $desc );
+				break;
+			default: // aioseo (tabela própria) e nenhum: guarda meta próprio.
+				update_term_meta( $term_id, '_ce61_seo_title', $title );
+				update_term_meta( $term_id, '_ce61_seo_desc', $desc );
+				break;
+		}
+		return true;
+	}
+
+	/**
+	 * Lê o SEO de termo do local do plugin ativo (para exibir na tabela).
+	 */
+	public static function get_term_seo( $term_id ) {
+		$term_id = (int) $term_id;
+		$out     = array( 'title' => '', 'desc' => '' );
+		switch ( self::active_plugin() ) {
+			case 'yoast':
+				$term = get_term( $term_id );
+				$opt  = get_option( 'wpseo_taxonomy_meta', array() );
+				if ( $term && ! is_wp_error( $term ) && isset( $opt[ $term->taxonomy ][ $term_id ] ) ) {
+					$m           = $opt[ $term->taxonomy ][ $term_id ];
+					$out['title'] = isset( $m['wpseo_title'] ) ? $m['wpseo_title'] : '';
+					$out['desc']  = isset( $m['wpseo_desc'] ) ? $m['wpseo_desc'] : '';
+				}
+				break;
+			case 'rankmath':
+				$out['title'] = (string) get_term_meta( $term_id, 'rank_math_title', true );
+				$out['desc']  = (string) get_term_meta( $term_id, 'rank_math_description', true );
+				break;
+			case 'seopress':
+				$out['title'] = (string) get_term_meta( $term_id, '_seopress_titles_title', true );
+				$out['desc']  = (string) get_term_meta( $term_id, '_seopress_titles_desc', true );
+				break;
+			default:
+				$out['title'] = (string) get_term_meta( $term_id, '_ce61_seo_title', true );
+				$out['desc']  = (string) get_term_meta( $term_id, '_ce61_seo_desc', true );
+				break;
+		}
+		return $out;
+	}
+
+	/**
 	 * Duplicate meta titles / focus keywords across the site (declared cannibalization).
 	 */
 	public static function duplicates() {
