@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.29.0
+Stable tag: 2.30.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.30.0 =
+* Novo: **seleção do provedor de IA por modal** na página Categorias. Um botão "Trocar provedor" abre um modal onde você escolhe qual provedor (Anthropic, OpenAI, Gemini ou Groq) será usado ao analisar posts, sugerir categorias e gerar SEO — sobrepondo a configuração por tarefa apenas nesta página. Provedores sem chave aparecem desabilitados; a opção "Padrão" mantém o provedor definido em Configurações. A geração de imagem continua usando o provedor da página Imagens.
 
 = 2.29.0 =
 * Novo: **Organizador de Categorias** — nova página com quatro abas para revisar, categorizar, popular de SEO/imagens e redirecionar.

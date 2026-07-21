@@ -103,7 +103,7 @@ class CE61_Categories {
 	/**
 	 * Pede à IA a melhor categoria para um post. Não grava nada.
 	 */
-	public static function analyze_post( $post_id ) {
+	public static function analyze_post( $post_id, $provider = '' ) {
 		$post_id = (int) $post_id;
 		$post    = get_post( $post_id );
 		if ( ! $post ) {
@@ -115,7 +115,7 @@ class CE61_Categories {
 			'categories_list'    => self::categories_prompt_list(),
 			'current_categories' => is_array( $current ) && $current ? implode( ', ', $current ) : '—',
 			'excerpt'            => mb_substr( $content, 0, 2500 ),
-		) );
+		), $provider );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
@@ -203,7 +203,7 @@ class CE61_Categories {
 	/**
 	 * Sugere novas categorias com base no conteúdo do site.
 	 */
-	public static function suggest( $count = 5 ) {
+	public static function suggest( $count = 5, $provider = '' ) {
 		$context = CE61_Creator::site_context( 50 );
 		if ( '' === trim( $context ) ) {
 			return new WP_Error( 'ce61_ctx', __( 'Escaneie o site primeiro para o plugin entender o conteúdo existente.', 'cluster-engine' ) );
@@ -212,7 +212,7 @@ class CE61_Categories {
 			'count'           => (int) $count,
 			'site_context'    => $context,
 			'categories_list' => self::categories_prompt_list(),
-		) );
+		), $provider );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
@@ -259,7 +259,7 @@ class CE61_Categories {
 	 * Gera (IA) e aplica SEO + descrição nativa da categoria. Devolve os
 	 * valores gravados e um image_prompt sugerido para a capa.
 	 */
-	public static function generate_seo( $term_id ) {
+	public static function generate_seo( $term_id, $provider = '' ) {
 		$term_id = (int) $term_id;
 		$term    = get_term( $term_id, self::TAX );
 		if ( ! $term || is_wp_error( $term ) ) {
@@ -269,7 +269,7 @@ class CE61_Categories {
 		$result = CE61_AI::run( 'category_seo', 0, array(
 			'category_name'  => $term->name,
 			'category_posts' => $sample ? $sample : '(sem posts nesta categoria ainda)',
-		) );
+		), $provider );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}

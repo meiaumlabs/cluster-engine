@@ -3031,7 +3031,8 @@ class CE61_Ajax {
 		if ( ! $post_id ) {
 			wp_send_json_error( array( 'message' => __( 'Post inválido.', 'cluster-engine' ) ) );
 		}
-		$res = CE61_Categories::analyze_post( $post_id );
+		$provider = isset( $_POST['provider'] ) ? sanitize_key( $_POST['provider'] ) : '';
+		$res      = CE61_Categories::analyze_post( $post_id, $provider );
 		if ( is_wp_error( $res ) ) {
 			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
 		}
@@ -3055,8 +3056,9 @@ class CE61_Ajax {
 
 	public static function categories_suggest() {
 		self::guard();
-		$count = isset( $_POST['count'] ) ? absint( $_POST['count'] ) : 5;
-		$res   = CE61_Categories::suggest( $count );
+		$count    = isset( $_POST['count'] ) ? absint( $_POST['count'] ) : 5;
+		$provider = isset( $_POST['provider'] ) ? sanitize_key( $_POST['provider'] ) : '';
+		$res      = CE61_Categories::suggest( $count, $provider );
 		if ( is_wp_error( $res ) ) {
 			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
 		}
@@ -3083,7 +3085,8 @@ class CE61_Ajax {
 		if ( ! $term_id ) {
 			wp_send_json_error( array( 'message' => __( 'Categoria inválida.', 'cluster-engine' ) ) );
 		}
-		$res = CE61_Categories::generate_seo( $term_id );
+		$provider = isset( $_POST['provider'] ) ? sanitize_key( $_POST['provider'] ) : '';
+		$res      = CE61_Categories::generate_seo( $term_id, $provider );
 		if ( is_wp_error( $res ) ) {
 			wp_send_json_error( array( 'message' => $res->get_error_message() ) );
 		}

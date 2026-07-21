@@ -4380,6 +4380,55 @@
 		}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
 	}
 
+	/* ---------- Categorias: provedor de IA (por sessão, escolhido em modal) ---------- */
+	var catProvider = ''; // '' = usa o provedor configurado por tarefa em Configurações
+
+	function catProviderLabel() {
+		if (!catProvider) { return 'Padrão (configuração)'; }
+		var m = CE61.aiProviders || {};
+		return (m[catProvider] && m[catProvider].name) || catProvider;
+	}
+
+	function catProviderBar() {
+		return '<div class="ce-card" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px">' +
+			'<div><b>Provedor de IA:</b> <span class="ce-chip ce-chip-kw ce-catprov-label">' + esc(catProviderLabel()) + '</span></div>' +
+			'<button class="ce-btn ce-btn-sm ce-catprov-btn">Trocar provedor</button>' +
+		'</div>';
+	}
+
+	function bindCatProviderBar(scope) {
+		var btn = $('.ce-catprov-btn', scope);
+		if (btn) { btn.addEventListener('click', openCatProviderModal); }
+	}
+
+	function openCatProviderModal() {
+		var m = CE61.aiProviders || {};
+		var keys = (CE61.settings && CE61.settings.has_key) || {};
+		var opts = '<label style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;cursor:pointer;border-bottom:1px solid var(--ce-border,#e4e4e7)">' +
+			'<input type="radio" name="ce-catprov" value=""' + (!catProvider ? ' checked' : '') + '>' +
+			'<span><b>Padrão (configuração)</b><br><span class="ce-hint">usa o provedor definido por tarefa em Configurações</span></span></label>';
+		Object.keys(m).forEach(function (k) {
+			if ((m[k].roles || []).indexOf('analysis') < 0) { return; }
+			var hasKey = !!keys[k];
+			opts += '<label style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--ce-border,#e4e4e7);cursor:' + (hasKey ? 'pointer' : 'not-allowed') + ';opacity:' + (hasKey ? '1' : '.5') + '">' +
+				'<input type="radio" name="ce-catprov" value="' + esc(k) + '"' + (catProvider === k ? ' checked' : '') + (hasKey ? '' : ' disabled') + '>' +
+				'<span><b>' + esc(m[k].name) + '</b>' + (hasKey ? '' : ' <span class="ce-hint">— sem chave configurada</span>') + '</span></label>';
+		});
+		modal(
+			'<h3 class="ce-h2">Provedor de IA para as categorias</h3>' +
+			'<p class="ce-sub">Escolha qual provedor de IA será usado ao analisar posts, sugerir categorias e gerar SEO nesta página. A geração de imagem continua usando o provedor da página Imagens.</p>' +
+			'<div style="margin:10px 0">' + opts + '</div>' +
+			'<p><button class="ce-btn ce-btn-primary" id="ce-catprov-save">Usar este provedor</button></p>'
+		);
+		$('#ce-catprov-save').addEventListener('click', function () {
+			var sel = document.querySelector('input[name="ce-catprov"]:checked');
+			catProvider = sel ? sel.value : '';
+			closeModal();
+			$$('.ce-catprov-label').forEach(function (el) { el.textContent = catProviderLabel(); });
+			toast('Provedor de IA: ' + catProviderLabel());
+		});
+	}
+
 	/* ---------- Categorias: organizar posts ---------- */
 	function renderCategoriesOrganize() {
 		var el = $('#ce-panel-categories_organize');
@@ -4390,6 +4439,7 @@
 				return;
 			}
 			el.innerHTML =
+				catProviderBar() +
 				'<div class="ce-section">' +
 					'<h2 class="ce-h2">Organizar posts em categorias</h2>' +
 					'<p class="ce-sub">A IA lê cada post e sugere a categoria que faz mais sentido. Nada é alterado sem a sua aprovação; ao aplicar, a sugestão vira a categoria primária mantendo as demais, e um 301 é criado se a URL mudar.</p>' +
@@ -4400,6 +4450,7 @@
 						d.posts.map(catRow).join('') +
 					'</tbody></table></div>' +
 				'</div>';
+			bindCatProviderBar(el);
 			bindCatOrganize(el);
 		}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
 	}
@@ -4438,7 +4489,7 @@
 		var btn = $('[data-cat-analyze]', row);
 		cell.innerHTML = '<span class="ce-hint">analisando…</span>';
 		if (btn) { btn.disabled = true; }
-		return api('category_analyze_post', { post_id: postId }).then(function (r) {
+		return api('category_analyze_post', { post_id: postId, provider: catProvider }).then(function (r) {
 			if (btn) { btn.disabled = false; }
 			if (r.already) {
 				cell.innerHTML = '<span class="ce-chip ce-chip-kw">' + esc(r.suggestion) + '</span> <span class="ce-hint">já é a primária</span>';
@@ -4478,6 +4529,7 @@
 				return;
 			}
 			el.innerHTML =
+				catProviderBar() +
 				'<div class="ce-section">' +
 					'<h2 class="ce-h2">SEO e imagens das categorias</h2>' +
 					'<p class="ce-sub">Popule título, descrição de SEO, descrição nativa e imagem de capa de cada categoria. O SEO é gravado no local que o seu plugin de SEO ativo lê.</p>' +
@@ -4485,6 +4537,7 @@
 						d.categories.map(catSeoCard).join('') +
 					'</div>' +
 				'</div>';
+			bindCatProviderBar(el);
 			bindCatSeo(el);
 		}).catch(function (e) { el.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
 	}
@@ -4514,7 +4567,7 @@
 				if (!requireKey()) { return; }
 				var card = b.closest('.ce-card');
 				b.disabled = true; b.textContent = 'Gerando…';
-				api('category_generate_seo', { term_id: b.dataset.seoGen }).then(function (r) {
+				api('category_generate_seo', { term_id: b.dataset.seoGen, provider: catProvider }).then(function (r) {
 					b.disabled = false; b.textContent = '✦ Gerar SEO';
 					$('[data-seo-title]', card).value = r.title || '';
 					$('[data-seo-desc]', card).value = r.desc || '';
@@ -4557,18 +4610,20 @@
 	function renderCategoriesSuggest() {
 		var el = $('#ce-panel-categories_suggest');
 		el.innerHTML =
+			catProviderBar() +
 			'<div class="ce-section">' +
 				'<h2 class="ce-h2">Sugerir novas categorias</h2>' +
 				'<p class="ce-sub">A IA analisa o conteúdo do site e propõe categorias que fariam sentido para organizar melhor os posts.</p>' +
 				'<p><button class="ce-btn ce-btn-primary" id="ce-cat-suggest-go">✦ Sugerir categorias</button></p>' +
 				'<div id="ce-cat-suggest-out"></div>' +
 			'</div>';
+		bindCatProviderBar(el);
 		$('#ce-cat-suggest-go').addEventListener('click', function () {
 			if (!requireKey()) { return; }
 			var btn = this, out = $('#ce-cat-suggest-out');
 			btn.disabled = true;
 			out.innerHTML = '<div class="ce-loading">Analisando o site e gerando sugestões</div>';
-			api('categories_suggest', { count: 6 }).then(function (d) {
+			api('categories_suggest', { count: 6, provider: catProvider }).then(function (d) {
 				btn.disabled = false;
 				if (!d.suggestions.length) { out.innerHTML = '<div class="ce-empty"><p>Nenhuma sugestão gerada.</p></div>'; return; }
 				out.innerHTML = '<div class="ce-grid" style="grid-template-columns:repeat(auto-fill,minmax(320px,1fr))">' +

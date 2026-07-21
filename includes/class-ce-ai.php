@@ -179,7 +179,7 @@ class CE61_AI {
 	/**
 	 * Run an action: build final prompt (global identity + template) and call the provider.
 	 */
-	public static function run( $action, $post_id = 0, $extra = array() ) {
+	public static function run( $action, $post_id = 0, $extra = array(), $force_provider = '' ) {
 		$prompts  = self::get_prompts();
 		$settings = get_option( 'ce61_settings', array() );
 
@@ -187,10 +187,25 @@ class CE61_AI {
 			return new WP_Error( 'ce61_no_action', __( 'Ação de IA desconhecida.', 'cluster-engine' ) );
 		}
 
+		$role = self::action_role( $action );
+
+		// Provedor forçado para esta chamada (ex.: escolha em modal). Só é aplicado
+		// se o provedor existir e for compatível com o papel da ação; a validação
+		// de chave/fallback continua em effective_provider(). Não persiste nada.
+		if ( '' !== $force_provider ) {
+			$meta = self::providers_meta();
+			if ( isset( $meta[ $force_provider ] ) && in_array( $role, $meta[ $force_provider ]['roles'], true ) ) {
+				if ( ! isset( $settings['role_provider'] ) || ! is_array( $settings['role_provider'] ) ) {
+					$settings['role_provider'] = array();
+				}
+				$settings['role_provider'][ $role ] = $force_provider;
+			}
+		}
+
 		$system = self::resolve_vars( isset( $settings['global_prompt'] ) ? $settings['global_prompt'] : '', $post_id, $extra );
 		$user   = self::resolve_vars( $prompts[ $action ]['prompt'], $post_id, $extra );
 
-		return self::complete( $system, $user, $settings, self::action_role( $action ) );
+		return self::complete( $system, $user, $settings, $role );
 	}
 
 	/**
