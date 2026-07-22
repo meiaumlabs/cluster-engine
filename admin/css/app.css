@@ -534,6 +534,17 @@ a.ce-url-slug:hover { color: var(--ce-cobalt); text-decoration: underline; }
 	.ce-hero p { margin-left: auto; margin-right: auto; }
 }
 
+/* ---- Utility classes ---- */
+.ce-mt-sm { margin-top: 14px; }
+.ce-mt-lg { margin-top: 26px; }
+.ce-mb-sm { margin-bottom: 12px; }
+.ce-grid-2 { grid-template-columns: 1fr 1fr; }
+.ce-grid-2-start { grid-template-columns: 1fr 1fr; align-items: start; }
+.ce-w-full { width: 100%; }
+.ce-maxw-240 { max-width: 240px; }
+.ce-font-display { font-family: var(--ce-display); }
+.ce-fieldset { border: none; padding: 0; margin: 0; }
+
 /* ---- Reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
 	.ce-app *, .ce-app *::before, .ce-app *::after {
