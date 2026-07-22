@@ -1095,12 +1095,13 @@
 				return;
 			}
 			box.innerHTML =
-				'<p style="margin:0 0 10px"><b style="font-family:var(--ce-display)">Tipos de conteúdo a auditar</b> <span class="ce-sub">— selecione só o que precisa; menos páginas = menos tempo e tokens</span></p>' +
+				'<fieldset class="ce-fieldset"><legend class="ce-kpi-label">Tipos de conteúdo a auditar</legend>' +
+				'<p class="ce-sub">Selecione só o que precisa — menos páginas = menos tempo e tokens.</p>' +
 				'<div style="display:flex;flex-wrap:wrap">' +
 				d.types.map(function (t) {
 					return '<label class="ce-check"><input type="checkbox" class="ce-schema-type" value="' + esc(t.type) + '" checked> ' + esc(t.label) + ' <span class="ce-sub">(' + t.count + ')</span></label>';
 				}).join('') +
-				'</div>' +
+				'</div></fieldset>' +
 				'<label class="ce-check" style="margin-top:6px"><input type="checkbox" id="ce-schema-skip" checked> Pular páginas já auditadas nos últimos 7 dias</label>';
 		}).catch(function (e) { box.innerHTML = '<p class="ce-sub">' + esc(e.message) + '</p>'; });
 	}
@@ -1967,12 +1968,12 @@
 					'</select></div>' +
 					'<div class="ce-field"><label>Cores da marca</label><input class="ce-input" id="ce-is-colors" value="' + esc(s.image_colors) + '" placeholder="ex.: azul #2547F4, branco e dourado"></div>' +
 				'</div>' +
-				'<div class="ce-field"><label>Estilos padrão (marcados entram sempre no prompt)</label><div class="ce-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:4px 14px">' +
+				'<div class="ce-field"><fieldset class="ce-fieldset"><legend class="ce-kpi-label">Estilos padrão (marcados entram sempre no prompt)</legend><div class="ce-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:4px 14px">' +
 					Object.keys(CE61.imageStylePresets).map(function (k) {
 						var checked = s.image_style_presets.indexOf(k) > -1 ? ' checked' : '';
 						return '<label class="ce-check"><input type="checkbox" class="ce-is-preset" value="' + k + '"' + checked + '> ' + esc(CE61.imageStylePresets[k].label) + '</label>';
 					}).join('') +
-				'</div></div>' +
+				'</div></fieldset></div>' +
 				'<div class="ce-field"><label>Notas de estilo (livre)</label><textarea class="ce-textarea" id="ce-is-style" style="min-height:60px" placeholder="ex.: público de clínicas médicas; visual clean e confiável">' + esc(s.image_style) + '</textarea></div>' +
 				'<div class="ce-grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">' +
 					'<div class="ce-field"><label class="ce-check"><input type="checkbox" id="ce-is-webp"' + (s.image_webp ? ' checked' : '') + '> Converter para WebP ao salvar</label><p class="ce-hint">Aplica-se a imagens geradas e enviadas pelo plugin, mantendo o SEO.</p></div>' +
@@ -2865,7 +2866,7 @@
 			'<div class=”ce-card”>' +
 				'<h3 class=”ce-h2”>Escopo do scan</h3>' +
 				'<p class=”ce-sub”>Tipos de post e limiares incluídos na análise de clusters e linkagem.</p>' +
-				pts +
+				'<fieldset class=”ce-fieldset”><legend class=”ce-kpi-label”>Post types analisados</legend>' + pts + '</fieldset>' +
 				'<h3 class=”ce-h2 ce-mt-sm”>Limiares de análise</h3>' +
 				'<div class=”ce-field”><label>Similaridade mínima para sugerir link</label><input class=”ce-input” id=”ce-sim-link” type=”number” step=”0.01” min=”0” max=”1” value=”' + s.sim_link + '”><p class=”ce-hint”>Padrão 0.22. Menor = mais sugestões.</p></div>' +
 				'<div class=”ce-field”><label>Similaridade abaixo da qual um link existente “não faz sentido”</label><input class=”ce-input” id=”ce-sim-weak” type=”number” step=”0.01” min=”0” max=”1” value=”' + s.sim_weak + '”></div>' +
