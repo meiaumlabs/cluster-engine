@@ -1422,7 +1422,7 @@
 					'<div class="ce-imgcard-body">' +
 						'<p class="ce-imgcard-title"><a href="' + esc(p.edit) + '" target="_blank" rel="noopener">' + esc(p.title) + '</a></p>' +
 						'<button class="ce-btn ce-btn-sm" data-imggen="' + p.post_id + '" data-title="' + esc(p.title) + '">' + (p.thumb ? '✦ Recriar destacada' : '✦ Gerar destacada') + '</button> ' +
-						'<button class="ce-btn ce-btn-sm ce-btn-ghost" data-imgcontent="' + p.post_id + '" data-title="' + esc(p.title) + '">🖼 No conteúdo</button>' +
+						'<button class="ce-btn ce-btn-sm ce-btn-ghost" data-imgcontent="' + p.post_id + '" data-title="' + esc(p.title) + '">◈ No conteúdo</button>' +
 					'</div></div>';
 			}
 			el.innerHTML =
@@ -2132,7 +2132,7 @@
 				(briefChips ? '<br>' + briefChips : '') + '</td>' +
 			'<td class="ce-sub">' + esc(t.keyword || '') + '</td>' +
 			'<td style="white-space:nowrap;text-align:right">' +
-				(hasBrief ? '<button class="ce-btn ce-btn-sm ce-btn-ghost" data-viewbrief="' + i + '" title="Ver briefing editorial">📋 Briefing</button> ' : '') +
+				(hasBrief ? '<button class="ce-btn ce-btn-sm ce-btn-ghost" data-viewbrief="' + i + '" title="Ver briefing editorial">⊟ Briefing</button> ' : '') +
 				(!done ? '<button class="ce-btn ce-btn-sm" data-gennow="' + i + '">✦ Gerar agora</button> ' : '') +
 				'<button class="ce-btn ce-btn-sm ce-btn-ghost" data-deltopic="' + i + '" title="Remover do plano">✕</button>' +
 			'</td></tr>';
