@@ -107,7 +107,9 @@
 .ce-btn-primary:hover { background: #1B2140; }
 .ce-btn-ghost { background: transparent; border-color: transparent; color: var(--ce-cobalt); }
 .ce-btn-sm { padding: 6px 14px; font-size: 12.5px; }
-.ce-btn[disabled] { opacity: .55; cursor: wait; transform: none !important; }
+.ce-btn[disabled] { opacity: .55; cursor: not-allowed; transform: none !important; }
+.ce-btn-danger { background: var(--ce-red); color: #fff; border-color: var(--ce-red); }
+.ce-btn-danger:hover { background: #b82e37; border-color: #b82e37; }
 
 /* ---- Scan progress ---- */
 .ce-scanbar { margin: 0 0 18px; animation: ce-fade .3s var(--ce-ease); }
