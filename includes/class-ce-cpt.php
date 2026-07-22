@@ -62,7 +62,7 @@ class CE61_CPT {
 	public static function list_cpts() {
 		global $wpdb;
 		$settings = get_option( 'ce61_settings', array() );
-		$enabled  = isset( $settings['post_types'] ) && $settings['post_types'] ? (array) $settings['post_types'] : array( 'post' );
+		$enabled  = CE61_Indexer::resolved_post_types( $settings );
 		$je_slugs = self::jetengine_cpt_slugs();
 
 		$types = get_post_types( array( 'public' => true, '_builtin' => false ), 'objects' );
@@ -202,7 +202,7 @@ class CE61_CPT {
 			return new WP_Error( 'ce61_cpt', __( 'Tipo de post inexistente.', 'cluster-engine' ) );
 		}
 		$settings = get_option( 'ce61_settings', array() );
-		$types    = isset( $settings['post_types'] ) && $settings['post_types'] ? array_values( (array) $settings['post_types'] ) : array( 'post' );
+		$types    = CE61_Indexer::resolved_post_types( $settings );
 		if ( $on ) {
 			if ( ! in_array( $post_type, $types, true ) ) {
 				$types[] = $post_type;
