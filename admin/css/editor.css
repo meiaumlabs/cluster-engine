@@ -1,5 +1,19 @@
 /* Cluster Engine — extensão no editor (barra superior, meta box, imagem destacada). */
 
+/* Design system 61labs — redeclarado para páginas de editor (app.css não é enfileirado aqui). */
+:root {
+	--ce-ink: #101426;
+	--ce-ink-2: #3B4159;
+	--ce-ink-3: #7A80A0;
+	--ce-violet: #7C3AED;
+	--ce-green: #2FA36B;
+	--ce-amber: #C77800;
+	--ce-red: #D93843;
+	--ce-line: #E3E6F2;
+	--ce-radius: 16px;
+	--ce-radius-sm: 10px;
+}
+
 /* Ícone na barra superior do admin. */
 #wp-admin-bar-ce61-ai .ce61-ab-icon {
 	font-family: dashicons;
@@ -56,9 +70,9 @@
 	font-size: 12px;
 	color: #50575e;
 }
-.ce61-featured-status.is-working { color: #7a52c7; }
-.ce61-featured-status.is-error { color: #b32d2e; }
-.ce61-featured-status.is-ok { color: #1a7f37; }
+.ce61-featured-status.is-working { color: var(--ce-violet); }
+.ce61-featured-status.is-error { color: var(--ce-red); }
+.ce61-featured-status.is-ok { color: var(--ce-green); }
 
 /* Modal de melhoria de conteúdo. */
 .ce61-ed-overlay {
@@ -76,7 +90,7 @@
 	width: 100%;
 	max-width: 920px;
 	background: #fff;
-	border-radius: 12px;
+	border-radius: var(--ce-radius);
 	box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
 	padding: 26px 26px 22px;
 	max-height: 90vh;
@@ -113,19 +127,19 @@
 	font-size: 14px;
 	line-height: 1.5;
 	padding: 10px 12px;
-	border-radius: 8px;
+	border-radius: var(--ce-radius-sm);
 }
 .ce61-ed-msg {
 	margin: 12px 0 0;
 	font-size: 13px;
 	padding: 10px 12px;
-	border-radius: 8px;
+	border-radius: var(--ce-radius-sm);
 	background: #f0f0f1;
 	color: #3c434a;
 }
-.ce61-ed-msg.is-working { background: #f3ecff; color: #6a3fbf; }
-.ce61-ed-msg.is-error { background: #fcf0f1; color: #b32d2e; }
-.ce61-ed-msg.is-ok { background: #edf7ef; color: #1a7f37; }
+.ce61-ed-msg.is-working { background: #f3ecff; color: var(--ce-violet); }
+.ce61-ed-msg.is-error { background: #fcf0f1; color: var(--ce-red); }
+.ce61-ed-msg.is-ok { background: #edf7ef; color: var(--ce-green); }
 .ce61-ed-actions {
 	display: flex;
 	justify-content: flex-end;
@@ -147,7 +161,7 @@
 	margin: 0 0 12px;
 	font-size: 14px;
 	color: #1d2327;
-	border-bottom: 1px solid #e4e0ee;
+	border-bottom: 1px solid var(--ce-line);
 	padding-bottom: 6px;
 }
 .ce61-col-diag { max-height: 62vh; overflow: auto; padding-right: 6px; }
@@ -159,7 +173,7 @@
 	font-size: 12px;
 	text-transform: uppercase;
 	letter-spacing: .03em;
-	color: #6a3fbf;
+	color: var(--ce-violet);
 }
 
 /* Barras de nota. */
@@ -184,9 +198,9 @@
 	border-radius: 6px;
 	transition: width .3s ease;
 }
-.ce61-score-track i.is-good { background: #1a7f37; }
-.ce61-score-track i.is-mid { background: #d9a406; }
-.ce61-score-track i.is-low { background: #b32d2e; }
+.ce61-score-track i.is-good { background: var(--ce-green); }
+.ce61-score-track i.is-mid { background: var(--ce-amber); }
+.ce61-score-track i.is-low { background: var(--ce-red); }
 
 /* Scan do painel. */
 .ce61-scan { display: flex; gap: 16px; font-size: 12px; color: #3c434a; }
@@ -207,8 +221,8 @@
 }
 .ce61-metric b { color: #1d2327; font-size: 14px; }
 .ce61-delta { font-size: 11px; font-weight: 600; }
-.ce61-delta.is-up { color: #1a7f37; }
-.ce61-delta.is-down { color: #b32d2e; }
+.ce61-delta.is-up { color: var(--ce-green); }
+.ce61-delta.is-down { color: var(--ce-red); }
 
 /* Melhorias sugeridas. */
 .ce61-issues {
@@ -228,7 +242,7 @@
 	content: "•";
 	position: absolute;
 	left: 4px;
-	color: #b32d2e;
+	color: var(--ce-red);
 }
 .ce61-issues li.ce61-issue {
 	display: flex;
@@ -242,9 +256,9 @@
 .ce61-issue-fix {
 	flex: 0 0 auto;
 	cursor: pointer;
-	border: 1px solid #6a3fbf;
+	border: 1px solid var(--ce-violet);
 	background: #f3ecff;
-	color: #6a3fbf;
+	color: var(--ce-violet);
 	font-size: 11px;
 	font-weight: 600;
 	line-height: 1;
@@ -252,7 +266,7 @@
 	border-radius: 999px;
 	transition: background .15s ease, color .15s ease;
 }
-.ce61-issue-fix:hover:not(:disabled) { background: #6a3fbf; color: #fff; }
+.ce61-issue-fix:hover:not(:disabled) { background: var(--ce-violet); color: #fff; }
 .ce61-issue-fix:disabled { opacity: .6; cursor: default; }
 .ce61-issue-manual {
 	flex: 0 0 auto;
@@ -268,13 +282,13 @@
 	margin: 0 0 12px;
 	font-size: 12px;
 	padding: 8px 10px;
-	border-radius: 8px;
+	border-radius: var(--ce-radius-sm);
 	background: #f0f0f1;
 	color: #3c434a;
 }
-.ce61-diag-msg.is-error { background: #fcf0f1; color: #b32d2e; }
-.ce61-diag-msg.is-ok { background: #edf7ef; color: #1a7f37; }
-.ce61-diag-msg.is-working { background: #f3ecff; color: #6a3fbf; }
+.ce61-diag-msg.is-error { background: #fcf0f1; color: var(--ce-red); }
+.ce61-diag-msg.is-ok { background: #edf7ef; color: var(--ce-green); }
+.ce61-diag-msg.is-working { background: #f3ecff; color: var(--ce-violet); }
 .ce61-diag-msg.is-warn { background: #fcf6e6; color: #8a6d00; }
 
 /* Correção em massa das pendências. */
@@ -320,11 +334,11 @@
 	line-height: 1.5;
 	padding: 8px 10px;
 	border: 1px solid #dcd7ea;
-	border-radius: 8px;
+	border-radius: var(--ce-radius-sm);
 	resize: vertical;
 }
 .ce61-meta-input:focus {
-	border-color: #6a3fbf;
+	border-color: var(--ce-violet);
 	outline: none;
 	box-shadow: 0 0 0 2px #ece3ff;
 }
@@ -347,17 +361,17 @@
 .ce61-meta-opt {
 	text-align: left;
 	cursor: pointer;
-	border: 1px solid #e4e0ee;
+	border: 1px solid var(--ce-line);
 	background: #faf9fd;
 	color: #3c434a;
 	font-size: 12px;
 	line-height: 1.45;
 	padding: 7px 10px;
-	border-radius: 8px;
+	border-radius: var(--ce-radius-sm);
 	transition: border-color .15s ease, background .15s ease;
 }
 .ce61-meta-opt:hover {
-	border-color: #6a3fbf;
+	border-color: var(--ce-violet);
 	background: #f3ecff;
 }
 
@@ -382,7 +396,7 @@
 	background: #eceaf3;
 	color: #50575e;
 }
-.ce61-tag.is-pub { background: #edf7ef; color: #1a7f37; }
+.ce61-tag.is-pub { background: #edf7ef; color: var(--ce-green); }
 .ce61-reverted { margin-top: 10px; }
 
 /* Rascunho de aprovação. */
@@ -393,8 +407,8 @@
 	margin: 4px 0 16px;
 }
 .ce61-draft {
-	border: 1px solid #e4e0ee;
-	border-radius: 8px;
+	border: 1px solid var(--ce-line);
+	border-radius: var(--ce-radius-sm);
 	padding: 16px 18px;
 	max-height: 46vh;
 	overflow: auto;
@@ -431,6 +445,6 @@
 	font-size: 14px;
 	line-height: 1.5;
 	padding: 10px 12px;
-	border-radius: 8px;
+	border-radius: var(--ce-radius-sm);
 	margin-top: 12px;
 }
