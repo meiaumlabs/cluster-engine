@@ -186,15 +186,29 @@
 	/* ---------- Tabs ---------- */
 	var loaded = {};
 	$$('.ce-tab').forEach(function (tab) {
+		var name = tab.dataset.tab;
+		tab.setAttribute('role', 'tab');
+		tab.setAttribute('id', 'ce-tab-' + name);
+		tab.setAttribute('aria-controls', 'ce-panel-' + name);
+		tab.setAttribute('aria-selected', tab.classList.contains('is-active') ? 'true' : 'false');
+		var panel = $('[data-panel="' + name + '"]');
+		if (panel) {
+			panel.setAttribute('role', 'tabpanel');
+			panel.setAttribute('id', 'ce-panel-' + name);
+			panel.setAttribute('aria-labelledby', 'ce-tab-' + name);
+		}
 		tab.addEventListener('click', function () {
 			var leaving = $('.ce-tab.is-active');
 			if (leaving && leaving.dataset.tab === 'network' && tab.dataset.tab !== 'network' && netState) {
 				netState.stop(); netState = null;
 			}
-			$$('.ce-tab').forEach(function (t) { t.classList.remove('is-active'); });
+			$$('.ce-tab').forEach(function (t) {
+				t.classList.remove('is-active');
+				t.setAttribute('aria-selected', 'false');
+			});
 			$$('.ce-panel').forEach(function (p) { p.classList.remove('is-active'); });
 			tab.classList.add('is-active');
-			var name = tab.dataset.tab;
+			tab.setAttribute('aria-selected', 'true');
 			$('[data-panel="' + name + '"]').classList.add('is-active');
 			loadPanel(name);
 		});
