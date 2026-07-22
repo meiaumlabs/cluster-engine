@@ -120,7 +120,7 @@ class CE61_Admin {
 			return;
 		}
 		$page = self::$hooks[ $hook ];
-		wp_enqueue_style( 'ce61-fonts', 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap', array(), CE61_VERSION );
+		wp_enqueue_style( 'ce61-fonts', CE61_URL . 'admin/fonts/fonts.css', array(), CE61_VERSION );
 		wp_enqueue_style( 'ce61-app', CE61_URL . 'admin/css/app.css', array(), CE61_VERSION );
 		wp_enqueue_script( 'ce61-app', CE61_URL . 'admin/js/app.js', array(), CE61_VERSION, true );
 		wp_enqueue_media(); // habilita o seletor de mídia do WordPress (wp.media) para o watermark em imagem.
