@@ -2827,7 +2827,7 @@
 		var el = $('#ce-panel-settings');
 		var s = CE61.settings;
 		var pts = CE61.postTypes.map(function (pt) {
-			var checked = s.post_types.indexOf(pt.name) > -1 ? ' checked' : '';
+			var checked = (!s.post_types.length || s.post_types.indexOf(pt.name) > -1) ? ' checked' : '';
 			return '<label class="ce-check"><input type="checkbox" name="pt" value="' + esc(pt.name) + '"' + checked + '> ' + esc(pt.label) + '</label>';
 		}).join('');
 		function keyField(prov, label) {
