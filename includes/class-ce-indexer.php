@@ -85,6 +85,15 @@ class CE61_Indexer {
 			$add( self::tokenize( $fk ), 5 );
 		}
 
+		// Taxonomy terms (categories, tags, custom taxonomies) weigh 3x to anchor
+		// semantic context for CPTs — ensures custom-taxonomy-based clusters form correctly.
+		foreach ( get_object_taxonomies( $post->post_type ) as $tax ) {
+			$tterms = wp_get_post_terms( $post->ID, $tax, array( 'fields' => 'names' ) );
+			if ( ! is_wp_error( $tterms ) && $tterms ) {
+				$add( self::tokenize( implode( ' ', $tterms ) ), 3 );
+			}
+		}
+
 		arsort( $tf );
 		return array_slice( $tf, 0, 60, true ); // keep top 60 terms per post.
 	}
@@ -170,11 +179,32 @@ class CE61_Indexer {
 	}
 
 	/**
+	 * Resolve the active post-type scope from settings.
+	 * An empty (or absent) post_types setting means full coverage:
+	 * all public types except 'attachment'.
+	 *
+	 * @param array|null $settings ce61_settings option (fetched when null).
+	 * @return string[] Post type names.
+	 */
+	public static function resolved_post_types( $settings = null ) {
+		if ( null === $settings ) {
+			$settings = get_option( 'ce61_settings', array() );
+		}
+		if ( ! empty( $settings['post_types'] ) && is_array( $settings['post_types'] ) ) {
+			return array_values( $settings['post_types'] );
+		}
+		return array_values( array_diff(
+			array_keys( get_post_types( array( 'public' => true ) ) ),
+			array( 'attachment' )
+		) );
+	}
+
+	/**
 	 * Get IDs of all indexable published posts.
 	 */
 	public static function indexable_ids() {
 		$settings = get_option( 'ce61_settings', array() );
-		$types    = isset( $settings['post_types'] ) && $settings['post_types'] ? (array) $settings['post_types'] : array( 'post' );
+		$types    = self::resolved_post_types( $settings );
 		return get_posts( array(
 			'post_type'      => $types,
 			'post_status'    => 'publish',

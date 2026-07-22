@@ -24,8 +24,7 @@ class CE61_Categories {
 	 */
 	private static function post_types() {
 		$s   = get_option( 'ce61_settings', array() );
-		$pts = isset( $s['post_types'] ) && is_array( $s['post_types'] ) ? $s['post_types'] : array( 'post' );
-		$pts = array_values( array_filter( $pts, function ( $pt ) {
+		$pts = array_values( array_filter( CE61_Indexer::resolved_post_types( $s ), function ( $pt ) {
 			return is_object_in_taxonomy( $pt, self::TAX );
 		} ) );
 		return $pts ? $pts : array( 'post' );

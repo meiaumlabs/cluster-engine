@@ -214,7 +214,7 @@ function ce61_activate() {
 
 	if ( ! get_option( 'ce61_settings' ) ) {
 		add_option( 'ce61_settings', array(
-			'post_types'      => array( 'post' ),
+			'post_types'      => array(), // empty = all public types (resolved at runtime)
 			'sim_link'        => 0.22, // similarity >= : suggest link.
 			'sim_weak'        => 0.08, // linked pairs below this = senseless link.
 			'sim_cannibal'    => 0.62, // above this + same intent = cannibalization.
@@ -265,7 +265,7 @@ function ce61_on_save( $post_id, $post ) {
 		return;
 	}
 	$settings = get_option( 'ce61_settings', array() );
-	$types    = isset( $settings['post_types'] ) ? (array) $settings['post_types'] : array( 'post' );
+	$types    = CE61_Indexer::resolved_post_types( $settings );
 	if ( 'publish' === $post->post_status && in_array( $post->post_type, $types, true ) ) {
 		CE61_Indexer::index_post( $post_id );
 		// Marca a data de edição de um post JÁ existente (não a criação),

@@ -145,7 +145,7 @@ class CE61_Admin {
 			),
 			'prompts'  => $safe,
 			'settings' => array(
-				'post_types'   => isset( $settings['post_types'] ) ? $settings['post_types'] : array( 'post' ),
+				'post_types'   => isset( $settings['post_types'] ) ? $settings['post_types'] : array(),
 				'provider'     => isset( $settings['provider'] ) ? $settings['provider'] : 'anthropic',
 				'role_provider' => isset( $settings['role_provider'] ) && is_array( $settings['role_provider'] ) ? $settings['role_provider'] : array(),
 				'model_light'  => isset( $settings['model_light'] ) ? $settings['model_light'] : '',

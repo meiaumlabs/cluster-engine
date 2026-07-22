@@ -2802,7 +2802,7 @@ class CE61_Ajax {
 
 		$cur['post_types'] = isset( $in['post_types'] )
 			? array_map( 'sanitize_key', (array) $in['post_types'] )
-			: ( isset( $cur['post_types'] ) ? $cur['post_types'] : array( 'post' ) );
+			: ( isset( $cur['post_types'] ) ? $cur['post_types'] : array() );
 		$cur['provider']   = isset( $in['provider'] )
 			? sanitize_key( $in['provider'] )
 			: ( isset( $cur['provider'] ) ? $cur['provider'] : 'anthropic' );
