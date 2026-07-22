@@ -575,13 +575,24 @@
 			box.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
 
 			$('#ce-rename').addEventListener('click', function () {
-				var name = window.prompt('Novo nome do cluster:', c.name);
-				if (name) {
+				modal(
+					'<h3 class="ce-h2">Renomear cluster</h3>' +
+					'<div class="ce-field"><input class="ce-input" id="ce-rename-input" value="' + esc(c.name) + '"></div>' +
+					'<p><button class="ce-btn ce-btn-primary" id="ce-rename-go">Salvar</button> ' +
+					'<button class="ce-btn ce-btn-ghost" id="ce-rename-cancel">Cancelar</button></p>'
+				);
+				var inp = $('#ce-rename-input');
+				inp.focus(); inp.select();
+				$('#ce-rename-go').addEventListener('click', function () {
+					var name = inp.value.trim();
+					if (!name) { return; }
 					api('rename_cluster', { cluster_id: c.id, name: name }).then(function () {
 						$('#ce-cname').textContent = name;
+						closeModal();
 						toast('Cluster renomeado');
 					}).catch(function (e) { toast(e.message, true); });
-				}
+				});
+				$('#ce-rename-cancel').addEventListener('click', closeModal);
 			});
 			$('#ce-gap').addEventListener('click', function () { gapArticle(c); });
 		}).catch(function (e) { box.innerHTML = '<div class="ce-empty"><p>' + esc(e.message) + '</p></div>'; });
