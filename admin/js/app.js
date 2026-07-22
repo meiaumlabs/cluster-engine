@@ -332,10 +332,22 @@
 	function renderInsights() {
 		var box = $('#ce-insights');
 		if (!box) { return; }
+		/* Renderiza o cabeçalho com botões desabilitados imediatamente — ficam visíveis antes do scan */
+		box.innerHTML =
+			'<div class="ce-cluster-head" style="margin-bottom:14px">' +
+				'<h2 class="ce-h2" style="margin:0">Insights do diagnóstico</h2>' +
+				'<button class="ce-btn" id="ce-report-btn" disabled title="Rode o scan primeiro">📄 Gerar relatório de performance</button>' +
+				'<button class="ce-btn ce-btn-ghost" id="ce-exec-btn" disabled title="Rode o scan primeiro">✍ Resumo executivo (IA)</button>' +
+			'</div>' +
+			'<div id="ce-insights-body"><div class="ce-loading">Compilando insights</div></div>';
 		api('report', {}).then(function (d) {
 			reportData = d;
+			var reportBtn = $('#ce-report-btn'), execBtn = $('#ce-exec-btn'), body = $('#ce-insights-body');
+			if (reportBtn) { reportBtn.disabled = false; reportBtn.removeAttribute('title'); reportBtn.addEventListener('click', openReportWindow); }
+			if (execBtn)   { execBtn.disabled   = false; execBtn.removeAttribute('title');   execBtn.addEventListener('click', execSummary); }
+			if (!body) { return; }
 			if (!d.insights.length) {
-				box.innerHTML = '<div class="ce-card"><h2 class="ce-h2">Insights do diagnóstico</h2><p class="ce-sub" style="margin:0">Nenhuma pendência encontrada nas análises. Rode um novo scan após publicar conteúdo.</p></div>';
+				body.innerHTML = '<div class="ce-card"><p class="ce-sub" style="margin:0">Nenhuma pendência encontrada nas análises. Rode um novo scan após publicar conteúdo.</p></div>';
 				return;
 			}
 			var cards = d.insights.map(function (ins, idx) {
@@ -367,15 +379,7 @@
 					'</p>' + pageRows +
 				'</div>';
 			}).join('');
-
-			box.innerHTML =
-				'<div class="ce-cluster-head" style="margin-bottom:14px">' +
-					'<h2 class="ce-h2" style="margin:0">Insights do diagnóstico</h2>' +
-					'<button class="ce-btn" id="ce-report-btn">📄 Gerar relatório de performance</button>' +
-					'<button class="ce-btn ce-btn-ghost" id="ce-exec-btn">✍ Resumo executivo (IA)</button>' +
-				'</div>' +
-				'<p class="ce-sub">Plano de ação priorizado a partir de tudo que foi analisado: clusters, linkagem, SEO on-page, AEO/GEO e E-E-A-T.</p>' + cards;
-
+			body.innerHTML = '<p class="ce-sub">Plano de ação priorizado a partir de tudo que foi analisado: clusters, linkagem, SEO on-page, AEO/GEO e E-E-A-T.</p>' + cards;
 			$$('[data-tpages]', box).forEach(function (b) {
 				b.addEventListener('click', function () {
 					var pg = $('#ce-ipages-' + b.dataset.tpages);
@@ -383,10 +387,9 @@
 					b.textContent = pg.hidden ? 'Ver páginas afetadas' : 'Ocultar páginas';
 				});
 			});
-			$('#ce-report-btn').addEventListener('click', openReportWindow);
-			$('#ce-exec-btn').addEventListener('click', execSummary);
 		}).catch(function (e) {
-			box.innerHTML = '<div class="ce-card"><p class="ce-sub" style="margin:0">' + esc(e.message) + '</p></div>';
+			var body = $('#ce-insights-body');
+			if (body) { body.innerHTML = '<div class="ce-card"><p class="ce-sub" style="margin:0">' + esc(e.message) + '</p></div>'; }
 		});
 	}
 
