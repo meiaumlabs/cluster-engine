@@ -1,19 +1,31 @@
 /* ============================================================
    Cluster Engine — 61 Labs · 61labs.com.br
-   Direção: modernismo brasiliense. Concreto claro, tinta profunda,
-   cobalto→violeta apenas no anel orbital (assinatura).
+   Identidade 61labs: tinta profunda (#0a0c10), sinal lima (#c6f24e)
+   como destaque/CTA e ciano (#56d4cd) no par de assinatura.
+   Superfície clara mantida para legibilidade no wp-admin.
    ============================================================ */
 
 :root {
-	--ce-ink: #101426;
-	--ce-ink-2: #3B4159;
-	--ce-ink-3: #7A80A0;
-	--ce-paper: #F5F6FB;
+	--ce-ink: #0a0c10;
+	--ce-ink-2: #33404a;
+	--ce-ink-3: #6c7889;
+	--ce-paper: #F4F6F4;
 	--ce-surface: #FFFFFF;
-	--ce-line: #E3E6F2;
-	--ce-cobalt: #2547F4;
-	--ce-cobalt-soft: #EAEEFF;
-	--ce-violet: #7C3AED;
+	--ce-line: #E2E6EC;
+
+	/* Sinal 61labs — lima. Fundo de destaque/CTA com texto tinta. */
+	--ce-signal: #c6f24e;
+	--ce-signal-ink: #0a0c10;
+	--ce-signal-deep: #b4e23c;
+	--ce-signal-soft: #eef8cf;
+	/* Ciano 61labs — parceiro de gradiente e brilhos. */
+	--ce-cyan: #56d4cd;
+
+	/* Papel de "accent" acessível sobre superfície clara: teal derivado
+	   do ciano, para links, foco e texto colorido (contraste AA). */
+	--ce-cobalt: #0b6d62;
+	--ce-cobalt-soft: #e3f6f3;
+	--ce-violet: #0f8a7c;
 	--ce-green: #2FA36B;
 	--ce-green-soft: #E7F6EE;
 	--ce-amber: #C77800;
@@ -38,7 +50,7 @@
 	font-family: var(--ce-body);
 	color: var(--ce-ink);
 	background:
-		radial-gradient(900px 420px at 85% -160px, rgba(37, 71, 244, .07), transparent 60%),
+		radial-gradient(900px 420px at 85% -160px, rgba(198, 242, 78, .10), transparent 60%),
 		var(--ce-paper);
 	min-height: calc(100vh - 32px);
 	padding: 28px 36px 0;
@@ -67,7 +79,7 @@
 .ce-orbit-mark {
 	position: relative; width: 52px; height: 52px; display: inline-block;
 	border-radius: 50%;
-	background: conic-gradient(from 210deg, var(--ce-cobalt), var(--ce-violet), var(--ce-cobalt));
+	background: conic-gradient(from 210deg, var(--ce-signal), var(--ce-cyan), var(--ce-signal));
 	-webkit-mask: radial-gradient(circle at center, transparent 58%, #000 60%);
 	        mask: radial-gradient(circle at center, transparent 58%, #000 60%);
 	animation: ce-spin 14s linear infinite;
@@ -75,11 +87,11 @@
 }
 .ce-orbit-mark i {
 	position: absolute; width: 8px; height: 8px; border-radius: 50%;
-	background: var(--ce-cobalt);
+	background: var(--ce-signal);
 	-webkit-mask: none; mask: none;
 }
 .ce-orbit-mark i:nth-child(1) { top: -1px; left: 50%; }
-.ce-orbit-mark i:nth-child(2) { bottom: 4px; left: 6px; background: var(--ce-violet); }
+.ce-orbit-mark i:nth-child(2) { bottom: 4px; left: 6px; background: var(--ce-cyan); }
 .ce-orbit-mark i:nth-child(3) { bottom: 4px; right: 6px; }
 @keyframes ce-spin { to { transform: rotate(360deg); } }
 
@@ -102,9 +114,11 @@
 .ce-btn:focus-visible { outline: 2px solid var(--ce-cobalt); outline-offset: 2px; }
 .ce-btn:active { transform: translateY(0); }
 .ce-btn-primary {
-	background: var(--ce-ink); color: #fff; border-color: var(--ce-ink);
+	background: var(--ce-signal); color: var(--ce-signal-ink); border-color: var(--ce-signal);
+	letter-spacing: .01em;
 }
-.ce-btn-primary:hover { background: #1B2140; }
+.ce-btn-primary:hover { background: var(--ce-signal-deep); border-color: var(--ce-signal-deep); }
+.ce-btn-primary:focus-visible { outline-color: var(--ce-signal-ink); }
 .ce-btn-ghost { background: transparent; border-color: transparent; color: var(--ce-cobalt); }
 .ce-btn-sm { padding: 6px 14px; font-size: 12.5px; }
 .ce-btn[disabled] { opacity: .55; cursor: not-allowed; transform: none !important; }
@@ -118,7 +132,7 @@
 }
 .ce-scanbar-fill {
 	height: 100%; width: 0%;
-	background: linear-gradient(90deg, var(--ce-cobalt), var(--ce-violet));
+	background: linear-gradient(90deg, var(--ce-signal), var(--ce-cyan));
 	border-radius: 999px; transition: width .35s var(--ce-ease);
 }
 .ce-scanbar p { margin: 6px 0 0; font-size: 12.5px; color: var(--ce-ink-3); font-family: var(--ce-mono); }
@@ -141,7 +155,7 @@
 .ce-tab.is-active::after {
 	content: ""; position: absolute; left: 12px; right: 12px; bottom: -1px;
 	height: 3px; border-radius: 3px 3px 0 0;
-	background: linear-gradient(90deg, var(--ce-cobalt), var(--ce-violet));
+	background: linear-gradient(90deg, var(--ce-signal), var(--ce-cyan));
 }
 
 /* ---- Panels ---- */
@@ -196,8 +210,8 @@
 /* Destination flash when arriving from a KPI card */
 .ce-flash { animation: ce-flash 1.5s var(--ce-ease); border-radius: var(--ce-radius); }
 @keyframes ce-flash {
-	0% { box-shadow: 0 0 0 3px rgba(37, 71, 244, .45); }
-	100% { box-shadow: 0 0 0 3px rgba(37, 71, 244, 0); }
+	0% { box-shadow: 0 0 0 3px rgba(198, 242, 78, .55); }
+	100% { box-shadow: 0 0 0 3px rgba(198, 242, 78, 0); }
 }
 
 /* ---- Hero: site score orbit ring (signature) ---- */
@@ -237,7 +251,7 @@
 	display: inline-flex; align-items: center; gap: 8px; min-width: 130px;
 }
 .ce-score-track { display: block; flex: 1; height: 6px; border-radius: 999px; background: var(--ce-line); overflow: hidden; }
-.ce-score-fill { display: block; height: 100%; width: 0; border-radius: 999px; background: var(--ce-cobalt); transition: width .9s var(--ce-ease); }
+.ce-score-fill { display: block; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--ce-signal), var(--ce-cyan)); transition: width .9s var(--ce-ease); }
 .ce-score-fill.is-warn { background: var(--ce-amber); }
 .ce-score-fill.is-bad { background: var(--ce-red); }
 .ce-score-fill.is-good { background: var(--ce-green); }
@@ -374,7 +388,7 @@ a.ce-url-slug:hover { color: var(--ce-cobalt); text-decoration: underline; }
 .ce-option small { color: var(--ce-ink-3); font-family: var(--ce-mono); }
 
 .ce-pre {
-	background: #14182B; color: #E8EAF6; border-radius: var(--ce-radius-sm);
+	background: #0f131b; color: #e8edf4; border-radius: var(--ce-radius-sm);
 	padding: 16px 18px; font-family: var(--ce-mono); font-size: 12.5px;
 	white-space: pre-wrap; max-height: 340px; overflow-y: auto;
 }
@@ -394,8 +408,8 @@ a.ce-url-slug:hover { color: var(--ce-cobalt); text-decoration: underline; }
 }
 .ce-textarea { font-family: var(--ce-mono); font-size: 12.5px; min-height: 120px; resize: vertical; line-height: 1.6; }
 .ce-input:focus, .ce-textarea:focus, .ce-select:focus {
-	outline: none; border-color: var(--ce-cobalt);
-	box-shadow: 0 0 0 3px rgba(37, 71, 244, .14);
+	outline: none; border-color: var(--ce-cyan);
+	box-shadow: 0 0 0 3px rgba(198, 242, 78, .30);
 }
 .ce-vars { margin: 6px 0 0; }
 .ce-vars code {
@@ -435,23 +449,23 @@ a.ce-url-slug:hover { color: var(--ce-cobalt); text-decoration: underline; }
 	margin-bottom: 12px;
 }
 .ce-net-legend { font-size: 12.5px; color: var(--ce-ink-3); display: inline-flex; align-items: center; gap: 6px; }
-.ce-net-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 8px 1px #5B8CFF; }
+.ce-net-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 8px 1px var(--ce-cyan); }
 .ce-net-count { margin-left: auto; font-size: 12.5px; color: var(--ce-ink-3); font-family: var(--ce-mono); }
 .ce-net-wrap {
 	position: relative; width: 100%; height: 640px;
 	border-radius: var(--ce-radius); overflow: hidden;
 	background:
-		radial-gradient(1200px 600px at 15% 0%, rgba(91,140,255,.10), transparent 60%),
-		radial-gradient(900px 500px at 90% 100%, rgba(124,58,237,.12), transparent 60%),
-		#0A0D1C;
-	border: 1px solid #1B2140;
+		radial-gradient(1200px 600px at 15% 0%, rgba(198,242,78,.10), transparent 60%),
+		radial-gradient(900px 500px at 90% 100%, rgba(86,212,205,.12), transparent 60%),
+		#0a0c10;
+	border: 1px solid #1c222c;
 	box-shadow: inset 0 0 60px rgba(0,0,0,.4);
 	cursor: grab;
 }
 .ce-net-wrap canvas { display: block; width: 100%; height: 100%; }
 .ce-net-tip {
 	position: absolute; z-index: 5; pointer-events: none;
-	background: rgba(16,20,38,.92); color: #E8EAF6; border: 1px solid rgba(124,58,237,.4);
+	background: rgba(10,12,16,.92); color: #e8edf4; border: 1px solid rgba(86,212,205,.4);
 	padding: 6px 12px; border-radius: 8px; font-size: 12.5px; font-family: var(--ce-display);
 	max-width: 260px; box-shadow: 0 6px 20px rgba(0,0,0,.4);
 	transform: translateY(-4px);
@@ -462,19 +476,19 @@ a.ce-url-slug:hover { color: var(--ce-cobalt); text-decoration: underline; }
 }
 .ce-net-zbtn {
 	width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
-	font-size: 18px; line-height: 1; font-family: var(--ce-display); color: #E8EAF6; cursor: pointer;
-	background: rgba(16,20,38,.82); border: 1px solid rgba(124,58,237,.45); border-radius: 9px;
+	font-size: 18px; line-height: 1; font-family: var(--ce-display); color: #e8edf4; cursor: pointer;
+	background: rgba(10,12,16,.82); border: 1px solid rgba(86,212,205,.45); border-radius: 9px;
 	box-shadow: 0 4px 14px rgba(0,0,0,.35); backdrop-filter: blur(4px);
 	transition: background .15s, transform .1s, border-color .15s;
 }
-.ce-net-zbtn:hover { background: rgba(124,58,237,.35); border-color: rgba(124,58,237,.8); }
+.ce-net-zbtn:hover { background: rgba(86,212,205,.28); border-color: rgba(86,212,205,.8); }
 .ce-net-zbtn:active { transform: translateY(1px); }
 .ce-net-zbtn:focus-visible { outline: 2px solid var(--ce-cobalt); outline-offset: 2px; }
 .ce-net-hint {
 	position: absolute; z-index: 6; left: 14px; bottom: 14px; pointer-events: none;
-	font-size: 11.5px; color: rgba(232,234,246,.7); font-family: var(--ce-mono);
-	background: rgba(16,20,38,.6); padding: 4px 10px; border-radius: 7px;
-	border: 1px solid rgba(124,58,237,.25);
+	font-size: 11.5px; color: rgba(232,237,244,.7); font-family: var(--ce-mono);
+	background: rgba(10,12,16,.6); padding: 4px 10px; border-radius: 7px;
+	border: 1px solid rgba(86,212,205,.25);
 }
 @media (max-width: 900px) {
 	.ce-net-wrap { height: 460px; }
@@ -500,7 +514,7 @@ a.ce-url-slug:hover { color: var(--ce-cobalt); text-decoration: underline; }
 }
 .ce-imgcard-check {
 	position: absolute; top: 8px; left: 8px; z-index: 2;
-	background: rgba(16,20,38,.55); border-radius: 6px; padding: 4px 6px;
+	background: rgba(10,12,16,.55); border-radius: 6px; padding: 4px 6px;
 	display: flex; align-items: center; cursor: pointer;
 }
 .ce-imgcard-check input { width: 15px; height: 15px; cursor: pointer; accent-color: var(--ce-cobalt); }

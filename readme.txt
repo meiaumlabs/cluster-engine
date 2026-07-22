@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.31.0
+Stable tag: 2.32.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,9 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.32.0 =
+* Identidade visual: reskin completo alinhado à paleta 61labs — tinta profunda (#0a0c10), verde-sinal (#c6f24e) como cor de destaque/CTA e ciano (#56d4cd) no par de assinatura (anel de score, barras de progresso, aba ativa). Botão primário agora usa o padrão da casa (fundo sinal + texto tinta). Superfície clara mantida para legibilidade no wp-admin, com um teal derivado do ciano garantindo contraste AA em links e textos coloridos. Aplicado ao painel, ao editor, ao grafo de rede e ao relatório de performance exportável.
 
 = 2.31.0 =
 * Correção: escopo de indexação agora cobre **todos os CPTs públicos** também na tela de gestão de tipos de post e ao ativar/desativar um tipo — antes, numa instalação nova (escopo vazio), os CPTs apareciam como desativados mesmo estando indexados, e desativar um único tipo colapsava o escopo apenas para "post".

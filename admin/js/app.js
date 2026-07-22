@@ -317,7 +317,7 @@
 					'<div class="ce-ring-wrap">' +
 						'<svg width="200" height="200" viewBox="0 0 200 200">' +
 							'<defs><linearGradient id="ceGrad" x1="0" y1="0" x2="1" y2="1">' +
-							'<stop offset="0%" stop-color="#2547F4"/><stop offset="100%" stop-color="#7C3AED"/></linearGradient></defs>' +
+							'<stop offset="0%" stop-color="#c6f24e"/><stop offset="100%" stop-color="#56d4cd"/></linearGradient></defs>' +
 							'<circle class="ce-ring-bg" cx="100" cy="100" r="' + r + '" fill="none" stroke-width="12"/>' +
 							'<circle class="ce-ring-val" cx="100" cy="100" r="' + r + '" fill="none" stroke-width="12" stroke-dasharray="' + circ + '" stroke-dashoffset="' + circ + '"/>' +
 						'</svg>' +
@@ -455,7 +455,7 @@
 		var d = reportData;
 		if (!d) { return; }
 		var prioLabel = { alta: 'ALTA', media: 'MÉDIA', aeo: 'AEO/GEO' };
-		var prioColor = { alta: '#D93843', media: '#C77800', aeo: '#2547F4' };
+		var prioColor = { alta: '#D93843', media: '#C77800', aeo: '#0b6d62' };
 		var clusterRows = d.clusters.map(function (c) {
 			return '<tr><td>' + esc(c.name) + '</td><td style="text-align:center"><b>' + c.score + '</b>/100</td><td style="text-align:center">' + c.posts + '</td><td>' + esc(c.pillar || '—') + '</td><td>' + esc(c.weakest || '—') + (c.weakest_score !== null ? ' (' + c.weakest_score + '/100)' : '') + '</td></tr>';
 		}).join('');
@@ -469,11 +469,11 @@
 		}).join('');
 
 		/* Constantes canônicas do design system 61 Labs */
-		var DS_INK     = '#101426';
-		var DS_INK_2   = '#3B4159';
-		var DS_INK_3   = '#7A80A0';
-		var DS_LINE    = '#E3E6F2';
-		var DS_COBALT  = '#2547F4';
+		var DS_INK     = '#0a0c10';
+		var DS_INK_2   = '#33404a';
+		var DS_INK_3   = '#6c7889';
+		var DS_LINE    = '#E2E6EC';
+		var DS_COBALT  = '#0b6d62';
 		var DS_FONT    = "'Space Grotesk',system-ui,sans-serif";
 		var DS_RADIUS  = '16px';
 
@@ -1966,7 +1966,7 @@
 					'<div class="ce-field"><label>Proporção padrão</label><select class="ce-select" id="ce-is-aspect">' +
 						Object.keys(CE61.imageAspectRatios).map(function (k) { return '<option value="' + k + '"' + (s.image_aspect === k ? ' selected' : '') + '>' + esc(CE61.imageAspectRatios[k].label) + '</option>'; }).join('') +
 					'</select></div>' +
-					'<div class="ce-field"><label>Cores da marca</label><input class="ce-input" id="ce-is-colors" value="' + esc(s.image_colors) + '" placeholder="ex.: azul #2547F4, branco e dourado"></div>' +
+					'<div class="ce-field"><label>Cores da marca</label><input class="ce-input" id="ce-is-colors" value="' + esc(s.image_colors) + '" placeholder="ex.: verde-sinal #c6f24e, tinta #0a0c10 e ciano #56d4cd"></div>' +
 				'</div>' +
 				'<div class="ce-field"><fieldset class="ce-fieldset"><legend class="ce-kpi-label">Estilos padrão (marcados entram sempre no prompt)</legend><div class="ce-grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:4px 14px">' +
 					Object.keys(CE61.imageStylePresets).map(function (k) {
@@ -3694,7 +3694,7 @@
 			if (v === null || v === undefined) { return; }
 			var px = x(i), py = y(v);
 			pathParts.push((pathParts.length ? 'L' : 'M') + px.toFixed(1) + ',' + py.toFixed(1));
-			dots.push('<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="2.6" fill="#2547F4"><title>' + esc(p.snap_date) + ': ' + esc(String(v)) + '</title></circle>');
+			dots.push('<circle cx="' + px.toFixed(1) + '" cy="' + py.toFixed(1) + '" r="2.6" fill="#0b6d62"><title>' + esc(p.snap_date) + ': ' + esc(String(v)) + '</title></circle>');
 		});
 		var markers = (updates || []).map(function (d) {
 			var idx = points.findIndex(function (p) { return p.snap_date === d; });
@@ -3708,7 +3708,7 @@
 			'<text x="4" y="' + (padT + 10) + '" font-size="10" fill="var(--ce-ink-3)">' + esc(String(Math.round(yTop))) + '</text>' +
 			'<text x="4" y="' + (H - padB) + '" font-size="10" fill="var(--ce-ink-3)">' + esc(String(Math.round(yBot))) + '</text>' +
 			markers +
-			'<path d="' + pathParts.join(' ') + '" fill="none" stroke="#2547F4" stroke-width="2"/>' +
+			'<path d="' + pathParts.join(' ') + '" fill="none" stroke="#0b6d62" stroke-width="2"/>' +
 			dots.join('') +
 			'<text x="' + padL + '" y="' + (H - 6) + '" font-size="10" fill="var(--ce-ink-3)">' + esc(points[0].snap_date) + '</text>' +
 			'<text x="' + (W - padR) + '" y="' + (H - 6) + '" font-size="10" fill="var(--ce-ink-3)" text-anchor="end">' + esc(points[n - 1].snap_date) + '</text>' +
@@ -3940,7 +3940,7 @@
 		var h = 0;
 		var s = String(cid || 0);
 		for (var i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) % 360; }
-		if (!cid) { h = 220; } // sem cluster: azul neutro.
+		if (!cid) { h = 176; } // sem cluster: ciano neutro (61labs).
 		return h;
 	}
 
@@ -3956,7 +3956,7 @@
 			el.innerHTML =
 				'<div class="ce-net-toolbar">' +
 					'<input class="ce-input" id="ce-net-search" placeholder="Buscar por título ou keyword…" style="max-width:280px">' +
-					'<span class="ce-net-legend"><i class="ce-net-dot" style="background:#5B8CFF"></i> tamanho = links recebidos · anel brilhante = pilar do cluster</span>' +
+					'<span class="ce-net-legend"><i class="ce-net-dot" style="background:#56d4cd"></i> tamanho = links recebidos · anel brilhante = pilar do cluster</span>' +
 					'<span class="ce-net-count">' + d.nodes.length + ' artigos · ' + d.edges.length + ' links</span>' +
 				'</div>' +
 				'<div class="ce-net-wrap" id="ce-net-wrap">' +

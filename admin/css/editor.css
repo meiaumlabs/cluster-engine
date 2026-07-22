@@ -1,17 +1,21 @@
 /* Cluster Engine — extensão no editor (barra superior, meta box, imagem destacada). */
 
-/* Design system 61labs — redeclarado para páginas de editor (app.css não é enfileirado aqui). */
+/* Design system 61labs — redeclarado para páginas de editor (app.css não é enfileirado aqui).
+   Accent = teal derivado do ciano 61labs (acessível sobre superfície clara);
+   'signal' lima reservado para destaques. */
 :root {
-	--ce-ink: #101426;
-	--ce-ink-2: #3B4159;
-	--ce-ink-3: #7A80A0;
-	--ce-violet: #7C3AED;
+	--ce-ink: #0a0c10;
+	--ce-ink-2: #33404a;
+	--ce-ink-3: #6c7889;
+	--ce-signal: #c6f24e;
+	--ce-cyan: #56d4cd;
+	--ce-violet: #0b6d62;
 	--ce-green: #2FA36B;
 	--ce-amber: #C77800;
 	--ce-red: #D93843;
-	--ce-line: #E3E6F2;
-	--ce-violet-soft: #f3ecff;
-	--ce-violet-softer: #faf9fd;
+	--ce-line: #E2E6EC;
+	--ce-violet-soft: #e3f6f3;
+	--ce-violet-softer: #f3fbfa;
 	--ce-radius: 16px;
 	--ce-radius-sm: 10px;
 }
@@ -23,7 +27,7 @@
 	line-height: 1;
 	vertical-align: middle;
 	margin-right: 4px;
-	color: #c9a3ff;
+	color: #c6f24e;
 }
 #wp-admin-bar-ce61-ai > .ab-item {
 	display: flex;
@@ -81,7 +85,7 @@
 	position: fixed;
 	inset: 0;
 	z-index: 100050;
-	background: rgba(15, 12, 25, 0.55);
+	background: rgba(10, 12, 16, 0.55);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -335,14 +339,14 @@
 	font-size: 13px;
 	line-height: 1.5;
 	padding: 8px 10px;
-	border: 1px solid #dcd7ea;
+	border: 1px solid #d4dbe0;
 	border-radius: var(--ce-radius-sm);
 	resize: vertical;
 }
 .ce61-meta-input:focus {
-	border-color: var(--ce-violet);
+	border-color: var(--ce-cyan);
 	outline: none;
-	box-shadow: 0 0 0 2px #ece3ff;
+	box-shadow: 0 0 0 2px rgba(198, 242, 78, .30);
 }
 .ce61-meta-row {
 	display: flex;
@@ -414,7 +418,7 @@
 	padding: 16px 18px;
 	max-height: 46vh;
 	overflow: auto;
-	background: #fcfbff;
+	background: #fbfdfc;
 	font-size: 14px;
 	line-height: 1.6;
 	color: #1d2327;
