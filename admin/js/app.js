@@ -746,20 +746,30 @@
 					'<div id="ce-merge-apply-out"></div>';
 				toast('Rascunho unificado criado');
 				$('#ce-merge-apply').addEventListener('click', function () {
-					if (!window.confirm('Confirma? O unificado será publicado, as URLs antigas passarão a redirecionar (301) para ele, e os dois posts originais irão para a lixeira.')) { return; }
-					var ao = $('#ce-merge-apply-out');
-					$('#ce-merge-apply').disabled = true;
-					ao.innerHTML = '<div class="ce-loading">Publicando e aplicando redirecionamentos</div>';
-					api('merge_apply', { draft_id: d.id, post_a: p[0], post_b: p[1] }).then(function (r) {
-						ao.innerHTML =
-							'<p><span class="ce-chip ce-chip-green">Concluído</span> ' + r.redirects + ' redirecionamentos 301 ativos · schema Article inserido · originais na lixeira</p>' +
-							'<p><a class="ce-btn ce-btn-sm" href="' + esc(r.view) + '" target="_blank" rel="noopener">Ver post publicado</a> ' +
-							'<a class="ce-btn ce-btn-sm ce-btn-ghost" href="' + esc(r.edit) + '" target="_blank" rel="noopener">Editar</a></p>';
-						if (row) { row.remove(); }
-						toast('Canibalização resolvida');
-					}).catch(function (e) {
-						$('#ce-merge-apply').disabled = false;
-						ao.innerHTML = '<p>' + esc(e.message) + '</p>';
+					modal(
+						'<h3 class="ce-h2">Confirmar publicação</h3>' +
+						'<p>O post unificado será <b>publicado</b>, as URLs antigas passarão a redirecionar via <b>301</b>, e os dois posts originais irão para a <b>lixeira</b>.</p>' +
+						'<p class="ce-sub">Esta ação afeta posts publicados no seu site. Os originais podem ser restaurados manualmente da lixeira.</p>' +
+						'<p><button class="ce-btn ce-btn-danger" id="ce-merge-confirm">⚡ Confirmar</button> ' +
+						'<button class="ce-btn ce-btn-ghost" id="ce-merge-abort">Cancelar</button></p>'
+					);
+					$('#ce-merge-abort').addEventListener('click', closeModal);
+					$('#ce-merge-confirm').addEventListener('click', function () {
+						closeModal();
+						var ao = $('#ce-merge-apply-out');
+						$('#ce-merge-apply').disabled = true;
+						ao.innerHTML = '<div class="ce-loading">Publicando e aplicando redirecionamentos</div>';
+						api('merge_apply', { draft_id: d.id, post_a: p[0], post_b: p[1] }).then(function (r) {
+							ao.innerHTML =
+								'<p><span class="ce-chip ce-chip-green">Concluído</span> ' + r.redirects + ' redirecionamentos 301 ativos · schema Article inserido · originais na lixeira</p>' +
+								'<p><a class="ce-btn ce-btn-sm" href="' + esc(r.view) + '" target="_blank" rel="noopener">Ver post publicado</a> ' +
+								'<a class="ce-btn ce-btn-sm ce-btn-ghost" href="' + esc(r.edit) + '" target="_blank" rel="noopener">Editar</a></p>';
+							if (row) { row.remove(); }
+							toast('Canibalização resolvida');
+						}).catch(function (e) {
+							$('#ce-merge-apply').disabled = false;
+							ao.innerHTML = '<p>' + esc(e.message) + '</p>';
+						});
 					});
 				});
 			}).catch(function (e) {
