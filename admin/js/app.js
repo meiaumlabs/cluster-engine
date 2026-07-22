@@ -2890,11 +2890,6 @@
 				'<p class="ce-hint">Injetado como instrução de sistema em toda ação de IA. Aceita variáveis como {{site_name}}.</p></div>' +
 			'</div>' +
 			'</div>' +
-			'<div class="ce-card" style="grid-column:1/-1">' +
-				'<h2 class="ce-h2">Imagens</h2>' +
-				'<p class="ce-sub">A geração, conversão WebP, presets e todas as configurações de imagem agora ficam centralizadas na página <b>Imagens</b>.</p>' +
-				'<p><a class="ce-btn ce-btn-primary" href="' + esc((CE61.pages && CE61.pages.images) || '#') + '">Abrir página de Imagens →</a></p>' +
-			'</div>' +
 			'<p style="margin-top:18px"><button class="ce-btn ce-btn-primary" id="ce-save-settings">Salvar configurações</button> ' +
 			'<button class="ce-btn" id="ce-test-ai">⚡ Testar conexão IA</button></p>';
 
