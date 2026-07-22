@@ -67,18 +67,38 @@
 	}
 
 	var _activeController = null;
+	var _modalTrigger = null;
+
+	var FOCUSABLE_SEL = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
 	function modal(html) {
+		_modalTrigger = document.activeElement;
 		$('#ce-modal-body').innerHTML = html;
 		$('#ce-modal').hidden = false;
+		var first = $('#ce-modal').querySelector(FOCUSABLE_SEL);
+		if (first) { first.focus(); }
 	}
 	function closeModal() {
 		if (_activeController) { _activeController.abort(); _activeController = null; }
 		$('#ce-modal').hidden = true;
+		if (_modalTrigger && typeof _modalTrigger.focus === 'function') { _modalTrigger.focus(); }
+		_modalTrigger = null;
 	}
 	$('#ce-modal-close').addEventListener('click', closeModal);
 	$('#ce-modal').addEventListener('click', function (e) { if (e.target === this) { closeModal(); } });
-	document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { closeModal(); } });
+	document.addEventListener('keydown', function (e) {
+		if (e.key === 'Escape') { closeModal(); return; }
+		if (e.key === 'Tab' && !$('#ce-modal').hidden) {
+			var focusable = Array.prototype.slice.call($('#ce-modal').querySelectorAll(FOCUSABLE_SEL));
+			if (!focusable.length) { e.preventDefault(); return; }
+			var first = focusable[0], last = focusable[focusable.length - 1];
+			if (e.shiftKey) {
+				if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+			} else {
+				if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+			}
+		}
+	});
 
 	function countUp(el, target) {
 		target = parseInt(target, 10) || 0;
