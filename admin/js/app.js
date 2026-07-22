@@ -436,26 +436,35 @@
 				(pages ? '<ul>' + pages + (i.n > i.pages.length ? '<li>… e mais ' + (i.n - i.pages.length) + ' páginas (ver no painel)</li>' : '') + '</ul>' : '') + '</div>';
 		}).join('');
 
+		/* Constantes canônicas do design system 61 Labs */
+		var DS_INK     = '#101426';
+		var DS_INK_2   = '#3B4159';
+		var DS_INK_3   = '#7A80A0';
+		var DS_LINE    = '#E3E6F2';
+		var DS_COBALT  = '#2547F4';
+		var DS_FONT    = "'Space Grotesk',system-ui,sans-serif";
+		var DS_RADIUS  = '16px';
+
 		var html = '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><title>Relatório de Performance — ' + esc(d.site_name) + '</title><style>' +
-			'body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#101426;max-width:820px;margin:40px auto;padding:0 24px;line-height:1.6}' +
-			'h1{font-size:24px;margin:0 0 4px}h2{font-size:17px;margin:32px 0 10px;border-bottom:2px solid #2547F4;padding-bottom:6px}' +
-			'.meta{color:#7A80A0;font-size:13px;margin:0 0 24px}' +
-			'.scores{display:flex;gap:16px;margin:20px 0}.scorebox{border:1px solid #E3E6F2;border-radius:12px;padding:14px 20px;text-align:center}' +
-			'.scorebox b{font-size:28px;display:block}.scorebox span{font-size:11px;color:#7A80A0;text-transform:uppercase;letter-spacing:.06em}' +
-			'table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{padding:8px 10px;border-bottom:1px solid #E3E6F2;text-align:left}th{font-size:11px;text-transform:uppercase;color:#7A80A0}' +
+			'body{font-family:' + DS_FONT + ';color:' + DS_INK + ';max-width:820px;margin:40px auto;padding:0 24px;line-height:1.6}' +
+			'h1{font-size:24px;margin:0 0 4px}h2{font-size:17px;margin:32px 0 10px;border-bottom:2px solid ' + DS_COBALT + ';padding-bottom:6px}' +
+			'.meta{color:' + DS_INK_3 + ';font-size:13px;margin:0 0 24px}' +
+			'.scores{display:flex;gap:16px;margin:20px 0}.scorebox{border:1px solid ' + DS_LINE + ';border-radius:' + DS_RADIUS + ';padding:14px 20px;text-align:center}' +
+			'.scorebox b{font-size:28px;display:block}.scorebox span{font-size:11px;color:' + DS_INK_3 + ';text-transform:uppercase;letter-spacing:.06em}' +
+			'table{width:100%;border-collapse:collapse;font-size:13.5px}th,td{padding:8px 10px;border-bottom:1px solid ' + DS_LINE + ';text-align:left}th{font-size:11px;text-transform:uppercase;color:' + DS_INK_3 + '}' +
 			'.item{margin-bottom:18px;page-break-inside:avoid}.prio{color:#fff;font-size:10.5px;font-weight:700;border-radius:99px;padding:2px 9px;letter-spacing:.04em}' +
-			'.why{color:#3B4159;font-size:13.5px;margin:4px 0}ul{margin:6px 0 0 18px;font-size:13px}a{color:#2547F4}' +
-			'.footer{margin-top:44px;padding-top:16px;border-top:1px solid #E3E6F2;color:#7A80A0;font-size:12.5px;text-align:center}' +
-			'.printbtn{position:fixed;top:16px;right:16px;background:#101426;color:#fff;border:none;border-radius:99px;padding:10px 20px;cursor:pointer;font-weight:600}' +
+			'.why{color:' + DS_INK_2 + ';font-size:13.5px;margin:4px 0}ul{margin:6px 0 0 18px;font-size:13px}a{color:' + DS_COBALT + '}' +
+			'.footer{margin-top:44px;padding-top:16px;border-top:1px solid ' + DS_LINE + ';color:' + DS_INK_3 + ';font-size:12.5px;text-align:center}' +
+			'.printbtn{position:fixed;top:16px;right:16px;background:' + DS_INK + ';color:#fff;border:none;border-radius:99px;padding:10px 20px;cursor:pointer;font-weight:600}' +
 			'@media print{.printbtn{display:none}body{margin:0 auto}}' +
 			'</style></head><body>' +
 			'<button class="printbtn" onclick="window.print()">Imprimir / Salvar PDF</button>' +
 			'<h1>Relatório de Performance de Conteúdo</h1>' +
 			'<p class="meta">' + esc(d.site_name) + ' · ' + esc(d.site_url) + ' · gerado em ' + esc(d.generated_at) + '</p>' +
 			'<div class="scores">' +
-				'<div class="scorebox"><b>' + d.site_score + '<small style="font-size:14px;color:#7A80A0">/100</small></b><span>Autoridade tópica</span></div>' +
-				'<div class="scorebox"><b>' + d.avg_seo + '<small style="font-size:14px;color:#7A80A0">/100</small></b><span>SEO on-page médio</span></div>' +
-				'<div class="scorebox"><b>' + d.avg_aeo + '<small style="font-size:14px;color:#7A80A0">/100</small></b><span>AEO/GEO médio</span></div>' +
+				'<div class="scorebox"><b>' + d.site_score + '<small style="font-size:14px;color:' + DS_INK_3 + '">/100</small></b><span>Autoridade tópica</span></div>' +
+				'<div class="scorebox"><b>' + d.avg_seo + '<small style="font-size:14px;color:' + DS_INK_3 + '">/100</small></b><span>SEO on-page médio</span></div>' +
+				'<div class="scorebox"><b>' + d.avg_aeo + '<small style="font-size:14px;color:' + DS_INK_3 + '">/100</small></b><span>AEO/GEO médio</span></div>' +
 				'<div class="scorebox"><b>' + d.total_posts + '</b><span>Posts analisados</span></div>' +
 			'</div>' +
 			'<h2>Força dos clusters</h2>' +
