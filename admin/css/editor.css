@@ -10,6 +10,8 @@
 	--ce-amber: #C77800;
 	--ce-red: #D93843;
 	--ce-line: #E3E6F2;
+	--ce-violet-soft: #f3ecff;
+	--ce-violet-softer: #faf9fd;
 	--ce-radius: 16px;
 	--ce-radius-sm: 10px;
 }
@@ -137,7 +139,7 @@
 	background: #f0f0f1;
 	color: #3c434a;
 }
-.ce61-ed-msg.is-working { background: #f3ecff; color: var(--ce-violet); }
+.ce61-ed-msg.is-working { background: var(--ce-violet-soft); color: var(--ce-violet); }
 .ce61-ed-msg.is-error { background: #fcf0f1; color: var(--ce-red); }
 .ce61-ed-msg.is-ok { background: #edf7ef; color: var(--ce-green); }
 .ce61-ed-actions {
@@ -257,7 +259,7 @@
 	flex: 0 0 auto;
 	cursor: pointer;
 	border: 1px solid var(--ce-violet);
-	background: #f3ecff;
+	background: var(--ce-violet-soft);
 	color: var(--ce-violet);
 	font-size: 11px;
 	font-weight: 600;
@@ -288,7 +290,7 @@
 }
 .ce61-diag-msg.is-error { background: #fcf0f1; color: var(--ce-red); }
 .ce61-diag-msg.is-ok { background: #edf7ef; color: var(--ce-green); }
-.ce61-diag-msg.is-working { background: #f3ecff; color: var(--ce-violet); }
+.ce61-diag-msg.is-working { background: var(--ce-violet-soft); color: var(--ce-violet); }
 .ce61-diag-msg.is-warn { background: #fcf6e6; color: #8a6d00; }
 
 /* Correção em massa das pendências. */
@@ -362,7 +364,7 @@
 	text-align: left;
 	cursor: pointer;
 	border: 1px solid var(--ce-line);
-	background: #faf9fd;
+	background: var(--ce-violet-softer);
 	color: #3c434a;
 	font-size: 12px;
 	line-height: 1.45;
@@ -372,7 +374,7 @@
 }
 .ce61-meta-opt:hover {
 	border-color: var(--ce-violet);
-	background: #f3ecff;
+	background: var(--ce-violet-soft);
 }
 
 /* Histórico / changelog. */
