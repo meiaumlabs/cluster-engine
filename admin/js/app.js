@@ -1509,7 +1509,7 @@
 
 		function shell(activeTab) {
 			return '<h3 class="ce-h2">Imagem destacada — ' + esc(title) + '</h3>' +
-				'<div class="ce-tabs" style="margin-bottom:14px"><button class="ce-tab' + (activeTab === 'stock' ? ' is-active' : '') + '" id="ce-imgmode-stock" type="button">🖼 Banco de imagens</button>' +
+				'<div class="ce-tabs" style="margin-bottom:14px"><button class="ce-tab' + (activeTab === 'stock' ? ' is-active' : '') + '" id="ce-imgmode-stock" type="button">◈ Banco de imagens</button>' +
 				'<button class="ce-tab' + (activeTab === 'ai' ? ' is-active' : '') + '" id="ce-imgmode-ai" type="button">✦ Gerar com IA</button></div>' +
 				'<div id="ce-imgmode-body"></div>';
 		}
@@ -1716,7 +1716,7 @@
 			'<div class="ce-field"><label>Imagem de referência (opcional)</label>' +
 				'<div id="ce-il-refzone" style="border:1px dashed var(--ce-line);border-radius:10px;padding:12px;text-align:center">' +
 					'<div id="ce-il-refpreview"></div>' +
-					'<p style="margin:6px 0"><button class="ce-btn ce-btn-sm" type="button" id="ce-il-reflib">🖼 Biblioteca</button> ' +
+					'<p style="margin:6px 0"><button class="ce-btn ce-btn-sm" type="button" id="ce-il-reflib">◈ Biblioteca</button> ' +
 					'<button class="ce-btn ce-btn-sm" type="button" id="ce-il-reffile">📁 Enviar arquivo</button></p>' +
 					'<p class="ce-hint" style="margin:0">ou arraste uma imagem aqui</p>' +
 					'<input type="file" id="ce-il-refinput" accept="image/*" hidden>' +
@@ -1989,7 +1989,7 @@
 						'<p class="ce-hint">Aplicado como texto no canto inferior direito.</p>' +
 					'</div>' +
 					'<div id="ce-is-wm-image-wrap"' + (s.image_watermark_type !== 'image' ? ' hidden' : '') + '>' +
-						'<p style="margin:0 0 8px"><button class="ce-btn ce-btn-sm" id="ce-is-wm-pick" type="button">🖼 Escolher da Biblioteca de Mídia</button> ' +
+						'<p style="margin:0 0 8px"><button class="ce-btn ce-btn-sm" id="ce-is-wm-pick" type="button">◈ Escolher da Biblioteca de Mídia</button> ' +
 						(s.image_watermark_media_url ? '<img src="' + esc(s.image_watermark_media_url) + '" alt="" style="height:36px;vertical-align:middle;margin-left:8px;border-radius:4px;border:1px solid var(--ce-line)" id="ce-is-wm-preview">' : '<img id="ce-is-wm-preview" alt="" style="height:36px;vertical-align:middle;margin-left:8px;border-radius:4px;display:none">') +
 						'</p>' +
 						'<input type="hidden" id="ce-is-wm-media-id" value="' + (s.image_watermark_media_id || '') + '">' +
@@ -2760,7 +2760,7 @@
 				var scores = ( j.status === 'done' && j.result && j.result.scores ) ? '<br>' + scoresRow(j.result.scores) : '';
 				return '<tr>' +
 					'<td style="width:40px" class="ce-sub">#' + j.id + '</td>' +
-					'<td>' + (isImage ? '🖼 ' : '') + esc(title) + meta + scores + (j.error ? '<br><span class="ce-sub" style="color:var(--ce-red,#c0392b)">' + esc(j.error) + '</span>' : '') + '</td>' +
+					'<td>' + (isImage ? '◈ ' : '') + esc(title) + meta + scores + (j.error ? '<br><span class="ce-sub" style="color:var(--ce-red,#c0392b)">' + esc(j.error) + '</span>' : '') + '</td>' +
 					'<td style="width:130px">' + queueStatusChip(j.status) + '</td>' +
 					'<td class="ce-sub" style="width:150px">' + esc(j.created_at || '') + '</td>' +
 					'<td style="white-space:nowrap;text-align:right">' + res + cancel + '</td>' +
