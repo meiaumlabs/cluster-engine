@@ -258,7 +258,7 @@ a.ce-url-slug:hover { color: var(--ce-cobalt); text-decoration: underline; }
 .ce-table th.ce-th-sort {
 	cursor: pointer; user-select: none; white-space: nowrap;
 }
-.ce-table th.ce-th-sort:hover { color: var(--ce-ink-1); }
+.ce-table th.ce-th-sort:hover { color: var(--ce-ink); }
 .ce-table th.ce-th-sort:focus-visible { outline: 2px solid var(--ce-cobalt); outline-offset: -2px; }
 .ce-th-arrow {
 	display: inline-block; width: 10px; margin-left: 4px;
