@@ -525,6 +525,9 @@ a.ce-url-slug:hover { color: var(--ce-cobalt); text-decoration: underline; }
 .ce-footer a { font-weight: 600; }
 
 /* ---- Responsive ---- */
+@media (max-width: 1200px) {
+	.ce-app { padding-left: 20px; padding-right: 20px; }
+}
 @media (max-width: 900px) {
 	.ce-app { padding: 20px 16px 0; }
 	.ce-hero { grid-template-columns: 1fr; text-align: center; }
