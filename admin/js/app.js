@@ -116,13 +116,11 @@
 
 	var tabPage = {
 		dashboard: 'main', clusters: 'main', links: 'main', keywords: 'main',
-		diagnostics: 'main', schema: 'main',
+		diagnostics: 'main', schema: 'main', network: 'main', performance: 'main',
 		images_articles: 'images', images_convert: 'images', images_presets: 'images', images_settings: 'images', images_errors: 'images',
-		creator: 'creator', queue: 'creator',
-		settings: 'settings', ai: 'settings', integrations: 'settings',
-		performance: 'performance', network: 'network',
-		cpt_manage: 'cpt', cpt_content: 'cpt',
-		categories_organize: 'categories', categories_seo: 'categories', categories_suggest: 'categories', categories_redirects: 'categories'
+		creator: 'creator', cpt_manage: 'creator', cpt_content: 'creator',
+		categories_organize: 'creator', categories_seo: 'creator', categories_suggest: 'creator', categories_redirects: 'creator', queue: 'creator',
+		settings: 'settings', ai: 'settings', integrations: 'settings'
 	};
 
 	function gotoTab(name) {

@@ -25,6 +25,7 @@ class CE61_Admin {
 	public static function init() {
 		add_action( 'admin_menu', array( __CLASS__, 'menu' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'assets' ) );
+		add_action( 'admin_init', array( __CLASS__, 'redirect_legacy' ) );
 	}
 
 	/**
@@ -40,6 +41,8 @@ class CE61_Admin {
 					'keywords'    => __( 'Palavras-chave', 'cluster-engine' ),
 					'diagnostics' => __( 'Diagnóstico', 'cluster-engine' ),
 					'schema'      => __( 'Schema', 'cluster-engine' ),
+					'network'     => __( 'Rede de Keywords', 'cluster-engine' ),
+					'performance' => __( 'Desempenho', 'cluster-engine' ),
 				),
 			),
 			'images' => array(
@@ -53,8 +56,14 @@ class CE61_Admin {
 			),
 			'creator' => array(
 				'tabs' => array(
-					'creator' => __( 'Novos clusters & conteúdo', 'cluster-engine' ),
-					'queue'   => __( 'Fila de geração', 'cluster-engine' ),
+					'creator'              => __( 'Novos clusters & conteúdo', 'cluster-engine' ),
+					'cpt_manage'           => __( 'CPTs existentes', 'cluster-engine' ),
+					'cpt_content'          => __( 'Conteúdo & clusters do CPT', 'cluster-engine' ),
+					'categories_organize'  => __( 'Organizar posts', 'cluster-engine' ),
+					'categories_seo'       => __( 'SEO & imagens', 'cluster-engine' ),
+					'categories_suggest'   => __( 'Sugerir categorias', 'cluster-engine' ),
+					'categories_redirects' => __( 'Redirects 301', 'cluster-engine' ),
+					'queue'                => __( 'Fila de geração', 'cluster-engine' ),
 				),
 			),
 			'settings' => array(
@@ -62,30 +71,6 @@ class CE61_Admin {
 					'settings'     => __( 'Configurações', 'cluster-engine' ),
 					'ai'           => __( 'IA & Prompts', 'cluster-engine' ),
 					'integrations' => __( 'Integrações', 'cluster-engine' ),
-				),
-			),
-			'performance' => array(
-				'tabs' => array(
-					'performance' => __( 'Desempenho das URLs', 'cluster-engine' ),
-				),
-			),
-			'network' => array(
-				'tabs' => array(
-					'network' => __( 'Rede de Palavras-chave', 'cluster-engine' ),
-				),
-			),
-			'cpt' => array(
-				'tabs' => array(
-					'cpt_manage'  => __( 'CPTs existentes', 'cluster-engine' ),
-					'cpt_content' => __( 'Conteúdo & clusters do CPT', 'cluster-engine' ),
-				),
-			),
-			'categories' => array(
-				'tabs' => array(
-					'categories_organize'  => __( 'Organizar posts', 'cluster-engine' ),
-					'categories_seo'       => __( 'SEO & imagens', 'cluster-engine' ),
-					'categories_suggest'   => __( 'Sugerir categorias', 'cluster-engine' ),
-					'categories_redirects' => __( 'Redirects 301', 'cluster-engine' ),
 				),
 			),
 		);
@@ -103,20 +88,31 @@ class CE61_Admin {
 		);
 		self::$hooks[ $hook ] = 'main';
 		add_submenu_page( 'cluster-engine', __( 'Painel', 'cluster-engine' ), __( 'Painel', 'cluster-engine' ), 'manage_options', 'cluster-engine', function () { self::render( 'main' ); } );
-		$hook = add_submenu_page( 'cluster-engine', __( 'Criação de Conteúdo', 'cluster-engine' ), __( 'Criação de Conteúdo', 'cluster-engine' ), 'manage_options', 'cluster-engine-creator', function () { self::render( 'creator' ); } );
+		$hook = add_submenu_page( 'cluster-engine', __( 'Conteúdo', 'cluster-engine' ), __( 'Conteúdo', 'cluster-engine' ), 'manage_options', 'cluster-engine-creator', function () { self::render( 'creator' ); } );
 		self::$hooks[ $hook ] = 'creator';
 		$hook = add_submenu_page( 'cluster-engine', __( 'Imagens', 'cluster-engine' ), __( 'Imagens', 'cluster-engine' ), 'manage_options', 'cluster-engine-images', function () { self::render( 'images' ); } );
 		self::$hooks[ $hook ] = 'images';
 		$hook = add_submenu_page( 'cluster-engine', __( 'Configurações', 'cluster-engine' ), __( 'Configurações', 'cluster-engine' ), 'manage_options', 'cluster-engine-settings', function () { self::render( 'settings' ); } );
 		self::$hooks[ $hook ] = 'settings';
-		$hook = add_submenu_page( 'cluster-engine', __( 'Desempenho', 'cluster-engine' ), __( 'Desempenho', 'cluster-engine' ), 'manage_options', 'cluster-engine-performance', function () { self::render( 'performance' ); } );
-		self::$hooks[ $hook ] = 'performance';
-		$hook = add_submenu_page( 'cluster-engine', __( 'Rede de Palavras-chave', 'cluster-engine' ), __( 'Rede de Keywords', 'cluster-engine' ), 'manage_options', 'cluster-engine-network', function () { self::render( 'network' ); } );
-		self::$hooks[ $hook ] = 'network';
-		$hook = add_submenu_page( 'cluster-engine', __( 'CPTs', 'cluster-engine' ), __( 'CPTs', 'cluster-engine' ), 'manage_options', 'cluster-engine-cpt', function () { self::render( 'cpt' ); } );
-		self::$hooks[ $hook ] = 'cpt';
-		$hook = add_submenu_page( 'cluster-engine', __( 'Categorias', 'cluster-engine' ), __( 'Categorias', 'cluster-engine' ), 'manage_options', 'cluster-engine-categories', function () { self::render( 'categories' ); } );
-		self::$hooks[ $hook ] = 'categories';
+	}
+
+	/**
+	 * Redireciona slugs de página legados para a nova hierarquia de 4 itens.
+	 * Garante que bookmarks de ?page=cluster-engine-performance etc. não 404.
+	 */
+	public static function redirect_legacy() {
+		if ( ! current_user_can( 'manage_options' ) ) { return; }
+		$page = isset( $_GET['page'] ) ? sanitize_key( $_GET['page'] ) : '';
+		$map  = array(
+			'cluster-engine-performance' => admin_url( 'admin.php?page=cluster-engine' ),
+			'cluster-engine-network'     => admin_url( 'admin.php?page=cluster-engine' ),
+			'cluster-engine-cpt'         => admin_url( 'admin.php?page=cluster-engine-creator' ),
+			'cluster-engine-categories'  => admin_url( 'admin.php?page=cluster-engine-creator' ),
+		);
+		if ( isset( $map[ $page ] ) ) {
+			wp_safe_redirect( $map[ $page ] );
+			exit;
+		}
 	}
 
 	public static function assets( $hook ) {
@@ -142,14 +138,10 @@ class CE61_Admin {
 			'nonce'    => wp_create_nonce( 'ce61_nonce' ),
 			'page'     => $page,
 			'pages'    => array(
-				'main'        => admin_url( 'admin.php?page=cluster-engine' ),
-				'creator'     => admin_url( 'admin.php?page=cluster-engine-creator' ),
-				'images'      => admin_url( 'admin.php?page=cluster-engine-images' ),
-				'settings'    => admin_url( 'admin.php?page=cluster-engine-settings' ),
-				'performance' => admin_url( 'admin.php?page=cluster-engine-performance' ),
-				'network'     => admin_url( 'admin.php?page=cluster-engine-network' ),
-				'cpt'         => admin_url( 'admin.php?page=cluster-engine-cpt' ),
-				'categories'  => admin_url( 'admin.php?page=cluster-engine-categories' ),
+				'main'     => admin_url( 'admin.php?page=cluster-engine' ),
+				'creator'  => admin_url( 'admin.php?page=cluster-engine-creator' ),
+				'images'   => admin_url( 'admin.php?page=cluster-engine-images' ),
+				'settings' => admin_url( 'admin.php?page=cluster-engine-settings' ),
 			),
 			'prompts'  => $safe,
 			'settings' => array(
@@ -237,14 +229,10 @@ class CE61_Admin {
 		$first = true;
 
 		$subtitles = array(
-			'main'        => __( 'Autoridade tópica, clusters e linkagem interna', 'cluster-engine' ),
-			'creator'     => __( 'Novos clusters e geração de conteúdo com base no seu site', 'cluster-engine' ),
-			'images'      => __( 'Geração, conversão WebP e SEO de todas as imagens dos artigos', 'cluster-engine' ),
-			'settings'    => __( 'Provedores de IA, prompts, limiares e integrações externas', 'cluster-engine' ),
-			'performance' => __( 'Posicionamento no Google, tráfego e cliques por página', 'cluster-engine' ),
-			'network'     => __( 'Como as palavras-chave conectam seus artigos', 'cluster-engine' ),
-			'cpt'         => __( 'Integração de Custom Post Types e geração de conteúdo', 'cluster-engine' ),
-			'categories'  => __( 'Organize posts em categorias, popule SEO/imagens e gerencie redirects 301', 'cluster-engine' ),
+			'main'     => __( 'Autoridade tópica, clusters, linkagem interna, desempenho e rede de keywords', 'cluster-engine' ),
+			'creator'  => __( 'Conteúdo, CPTs, Categorias e fila de geração', 'cluster-engine' ),
+			'images'   => __( 'Geração, conversão WebP e SEO de todas as imagens dos artigos', 'cluster-engine' ),
+			'settings' => __( 'Provedores de IA, prompts, limiares e integrações externas', 'cluster-engine' ),
 		);
 		?>
 		<div class="ce-app" id="ce-app">
