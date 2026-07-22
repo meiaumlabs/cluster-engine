@@ -345,7 +345,7 @@
 					kpi('Score SEO médio', d.avg_seo, d.avg_seo >= 75 ? 'good' : 'warn', null, 'diagnostics') +
 					kpi('Score AEO/GEO médio', d.avg_aeo, d.avg_aeo >= 75 ? 'good' : 'warn', 'prontidão para AI Overviews', 'diagnostics') +
 				'</div>' +
-				'<div class="ce-section" id="ce-insights" style="margin-top:26px"><div class="ce-loading">Compilando insights</div></div>';
+				'<div class="ce-section ce-mt-lg" id="ce-insights"><div class="ce-loading">Compilando insights</div></div>';
 			renderInsights();
 			$$('[data-count]', el).forEach(function (n) { countUp(n, n.dataset.count); });
 			requestAnimationFrame(function () {
@@ -402,9 +402,9 @@
 					pageRows = '<div class="ce-insight-pages" id="ce-ipages-' + idx + '" hidden><table class="ce-table"><tbody>' + pageRows + '</tbody></table>' +
 						(ins.n > ins.pages.length ? '<p class="ce-sub" style="margin:8px 0 0">Mostrando ' + ins.pages.length + ' de ' + ins.n + ' — veja todos na seção de correção.</p>' : '') + '</div>';
 				}
-				return '<div class="ce-card" style="margin-bottom:12px">' +
+				return '<div class="ce-card ce-mb-sm">' +
 					'<p style="margin:0 0 6px"><span class="ce-chip ' + meta.chip + '">' + meta.label + '</span> ' +
-					'<b style="font-family:var(--ce-display)">' + ins.n + '</b></p>' +
+					'<b class="ce-font-display">' + ins.n + '</b></p>' +
 					'<h3 style="font-family:var(--ce-display);font-size:15px;margin:0 0 4px">' + esc(ins.title) + '</h3>' +
 					'<p class="ce-sub" style="margin:0 0 10px">' + esc(ins.why) + '</p>' +
 					'<p style="margin:0">' +
@@ -989,7 +989,7 @@
 				'<div class="ce-card ce-table-wrap"><table class="ce-table"><thead><tr><th>Termo</th><th>Posts</th><th>Onde aparece</th></tr></thead><tbody>' + (rows || '') + '</tbody></table></div></div>' +
 				'<div class="ce-section"><h2 class="ce-h2">Canibalização declarada</h2>' +
 				'<p class="ce-sub">Meta titles e keywords foco repetidos no seu plugin de SEO — dois posts disputando a mesma SERP. Estratégia: mantenha o valor no post mais forte e reescreva nos demais; ou, se os posts são quase iguais, recrie unificado.</p>' +
-				'<div class="ce-grid" style="grid-template-columns:1fr 1fr;align-items:start">' +
+				'<div class="ce-grid ce-grid-2-start">' +
 					'<div class="ce-card"><p class="ce-kpi-label">Meta titles duplicados</p>' + (dupT || '<p class="ce-sub" style="margin:0">Nenhum.</p>') + '</div>' +
 					'<div class="ce-card"><p class="ce-kpi-label">Keywords foco duplicadas</p>' + (dupK || '<p class="ce-sub" style="margin:0">Nenhuma.</p>') + '</div>' +
 				'</div></div>';
@@ -1204,9 +1204,9 @@
 				'<div class="ce-card ce-table-wrap">' +
 				'<p style="margin:0 0 12px"><b style="font-family:var(--ce-display)">' + withIssues + '</b> de ' + results.length + ' páginas com pendências de schema</p>' +
 				rmNote +
-				'<div class="ce-net-toolbar" style="margin-bottom:12px">' +
+				'<div class="ce-net-toolbar ce-mb-sm">' +
 					'<label class="ce-check"><input type="checkbox" id="ce-schema-selall"> Selecionar tudo</label>' +
-					'<select class="ce-select" id="ce-schema-bulk-mode" style="max-width:240px">' +
+					'<select class="ce-select ce-maxw-240" id="ce-schema-bulk-mode">' +
 						'<option value="article">◈ Inserir Article (sem IA)</option>' +
 						'<option value="faq">✍ Gerar FAQ + schema (IA)</option>' +
 						'<option value="repair">⚠ Corrigir schema exposto (sem IA)</option>' +
@@ -2145,8 +2145,8 @@
 			'<h3 class="ce-h2">Briefing — ' + esc(t.title) + '</h3>' +
 			'<p class="ce-sub">Sugerido pela IA com base no próprio conhecimento dela sobre o tema (não é busca ao vivo no Google) — use como ponto de partida e ajuste se souber de algo mais específico do seu público.</p>' +
 			'<p>' + (t.word_count ? '<span class="ce-chip ce-chip-kw">~' + t.word_count + ' palavras</span> ' : '') + (t.h2_count ? '<span class="ce-chip ce-chip-kw">' + t.h2_count + ' subtítulos H2</span>' : '') + '</p>' +
-			(subs ? '<p class="ce-kpi-label" style="margin-top:14px">Subtemas a cobrir</p><ul class="ce-eeat-list">' + subs + '</ul>' : '') +
-			(faqs ? '<p class="ce-kpi-label" style="margin-top:14px">Perguntas frequentes sugeridas</p><ul class="ce-eeat-list">' + faqs + '</ul>' : '')
+			(subs ? '<p class="ce-kpi-label ce-mt-sm">Subtemas a cobrir</p><ul class="ce-eeat-list">' + subs + '</ul>' : '') +
+			(faqs ? '<p class="ce-kpi-label ce-mt-sm">Perguntas frequentes sugeridas</p><ul class="ce-eeat-list">' + faqs + '</ul>' : '')
 		);
 	}
 
@@ -2471,7 +2471,7 @@
 					}).then(function (r) {
 						genBtn.disabled = false;
 						out.innerHTML =
-							'<div class="ce-card" style="margin-top:14px">' +
+							'<div class="ce-card ce-mt-sm">' +
 								'<p style="margin:0 0 10px" id="ce-gen-status">' + statusChip(r.status, '') + ' <b style="font-family:var(--ce-display)">' + esc(r.title) + '</b></p>' +
 								'<p><a class="ce-btn ce-btn-sm" href="' + esc(r.edit) + '" target="_blank" rel="noopener">Abrir no editor</a> ' +
 								'<button class="ce-btn ce-btn-sm ce-btn-primary" id="ce-gen-pub">Publicar/Agendar</button></p>' +
@@ -2863,7 +2863,7 @@
 				(hint ? '<p class="ce-hint">' + hint + '</p>' : '') + '</div>';
 		}
 		el.innerHTML =
-			'<div class="ce-grid" style="grid-template-columns:1fr 1fr;align-items:start">' +
+			'<div class="ce-grid ce-grid-2-start">' +
 			'<div class="ce-card">' +
 				'<h2 class="ce-h2">Conteúdo analisado</h2><p class="ce-sub">Tipos de post incluídos no scan.</p>' + pts +
 				'<h2 class="ce-h2" style="margin-top:22px">Limiares de análise</h2>' +
@@ -2996,7 +2996,7 @@
 		}
 
 		el.innerHTML =
-			'<div class="ce-grid" style="grid-template-columns:1fr 1fr;align-items:start">' +
+			'<div class="ce-grid ce-grid-2-start">' +
 			'<div class="ce-card">' +
 				'<h2 class="ce-h2">API de posicionamento (SERP)</h2>' +
 				'<p class="ce-sub">Usada na página Desempenho para checar em qual posição do Google cada post aparece pela sua keyword foco. Padrão: Serper.dev (2.500 buscas grátis no cadastro, sem cartão).</p>' +
@@ -3085,7 +3085,7 @@
 						var has = s.has_key[p];
 						return '<div class="ce-card" style="padding:14px 16px">' +
 							'<p style="margin:0 0 6px;display:flex;justify-content:space-between;align-items:center">' +
-								'<b style="font-family:var(--ce-display)">' + (idx + 1) + '. ' + esc(info.label || p) + '</b>' +
+								'<b class="ce-font-display">' + (idx + 1) + '. ' + esc(info.label || p) + '</b>' +
 								(needsKey ? (has ? '<span class="ce-chip ce-chip-green">chave salva</span>' : '<span class="ce-chip ce-chip-amber">sem chave</span>') : '<span class="ce-chip ce-chip-green">sem chave necessária</span>') +
 							'</p>' +
 							(needsKey ? '<input class="ce-input" type="password" id="ce-stockkey-' + p + '" placeholder="' + (has ? '•••••••• (chave salva)' : 'Cole a chave de API') + '" autocomplete="off" style="margin-bottom:8px">' : '') +
@@ -3790,7 +3790,7 @@
 			modal(
 				'<h3 class="ce-h2">Insight de IA — ' + esc(title) + '</h3>' +
 				'<div class="ce-pre" style="background:var(--ce-paper);color:var(--ce-ink);white-space:pre-wrap">' + esc(d.insight) + '</div>' +
-				'<p style="margin-top:14px">' +
+				'<p class="ce-mt-sm">' +
 					'<button class="ce-btn ce-btn-primary" id="ce-insight-save">💾 Salvar este insight</button> ' +
 					'<button class="ce-btn ce-btn-ghost" id="ce-insight-hist">🗒 Ver histórico salvo</button>' +
 				'</p>' +
@@ -4422,7 +4422,7 @@
 					}).then(function (r) {
 						btn.disabled = false;
 						out.innerHTML =
-							'<div class="ce-card" style="margin-top:14px">' +
+							'<div class="ce-card ce-mt-sm">' +
 								'<p style="margin:0 0 10px" id="ce-cpt-status">' + statusChip(r.status, '') + ' <b style="font-family:var(--ce-display)">' + esc(r.title) + '</b></p>' +
 								'<p><a class="ce-btn ce-btn-sm" href="' + esc(r.edit) + '" target="_blank" rel="noopener">Abrir no editor</a> ' +
 								'<button class="ce-btn ce-btn-sm ce-btn-primary" id="ce-cpt-pub">Publicar/Agendar</button></p>' +
