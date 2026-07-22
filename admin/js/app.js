@@ -1250,13 +1250,13 @@
 					var v = sorter(a, b);
 					return schemaSort.dir === 'asc' ? v : -v;
 				});
-				var empty = schemaFilter === 'issues'
-					? 'Nenhuma página com pendências de schema. 🎉'
-					: (schemaFilter === 'done' ? 'Nenhuma página completa ainda.' : 'Nenhuma página corresponde à busca.');
+				var emptyHtml = schemaFilter === 'issues'
+					? '<div class="ce-empty" style="padding:20px 0"><span class="ce-orbit-mark" aria-hidden="true"><i></i><i></i><i></i></span><p>Nenhuma página com pendências de schema.</p></div>'
+					: '<div class="ce-empty" style="padding:20px 0"><p>' + (schemaFilter === 'done' ? 'Nenhuma página completa ainda.' : 'Nenhuma página corresponde à busca.') + '</p></div>';
 				var tbody = $('#ce-schema-tbody');
 				tbody.innerHTML = list.length
 					? list.map(schemaRowHtml).join('')
-					: '<tr><td colspan="6"><div class="ce-empty" style="padding:20px 0"><p>' + empty + '</p></div></td></tr>';
+					: '<tr><td colspan="6">' + emptyHtml + '</td></tr>';
 				var cnt = $('#ce-schema-count');
 				if (cnt) { cnt.textContent = list.length + ' de ' + results.length + ' página(s)'; }
 				bindRows();
