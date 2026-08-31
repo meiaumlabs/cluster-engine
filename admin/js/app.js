@@ -2863,42 +2863,48 @@
 		}
 		el.innerHTML =
 			// Grupo 1: Escopo do scan
-			'<div class=”ce-card”>' +
-				'<h3 class=”ce-h2”>Escopo do scan</h3>' +
-				'<p class=”ce-sub”>Tipos de post e limiares incluídos na análise de clusters e linkagem.</p>' +
-				'<fieldset class=”ce-fieldset”><legend class=”ce-kpi-label”>Post types analisados</legend>' + pts + '</fieldset>' +
-				'<h3 class=”ce-h2 ce-mt-sm”>Limiares de análise</h3>' +
-				'<div class=”ce-field”><label>Similaridade mínima para sugerir link</label><input class=”ce-input” id=”ce-sim-link” type=”number” step=”0.01” min=”0” max=”1” value=”' + s.sim_link + '”><p class=”ce-hint”>Padrão 0.22. Menor = mais sugestões.</p></div>' +
-				'<div class=”ce-field”><label>Similaridade abaixo da qual um link existente “não faz sentido”</label><input class=”ce-input” id=”ce-sim-weak” type=”number” step=”0.01” min=”0” max=”1” value=”' + s.sim_weak + '”></div>' +
-				'<div class=”ce-field”><label>Similaridade que indica canibalização</label><input class=”ce-input” id=”ce-sim-cannibal” type=”number” step=”0.01” min=”0” max=”1” value=”' + s.sim_cannibal + '”></div>' +
-				'<div class=”ce-field”><label>Mínimo de palavras (conteúdo fino)</label><input class=”ce-input” id=”ce-min-words” type=”number” value=”' + s.min_words + '”></div>' +
-				'<div class=”ce-field”><label>Meses até considerar desatualizado</label><input class=”ce-input” id=”ce-stale” type=”number” value=”' + s.stale_months + '”></div>' +
+			'<div class="ce-card">' +
+				'<h3 class="ce-h2">Escopo do scan</h3>' +
+				'<p class="ce-sub">Tipos de post e limiares incluídos na análise de clusters e linkagem.</p>' +
+				'<fieldset class="ce-fieldset"><legend class="ce-kpi-label">Post types analisados</legend>' + pts + '</fieldset>' +
+				'<h3 class="ce-h2 ce-mt-sm">Limiares de análise</h3>' +
+				'<div class="ce-field"><label>Similaridade mínima para sugerir link</label><input class="ce-input" id="ce-sim-link" type="number" step="0.01" min="0" max="1" value="' + s.sim_link + '"><p class="ce-hint">Padrão 0.22. Menor = mais sugestões.</p></div>' +
+				'<div class="ce-field"><label>Similaridade abaixo da qual um link existente “não faz sentido”</label><input class="ce-input" id="ce-sim-weak" type="number" step="0.01" min="0" max="1" value="' + s.sim_weak + '"></div>' +
+				'<div class="ce-field"><label>Similaridade que indica canibalização</label><input class="ce-input" id="ce-sim-cannibal" type="number" step="0.01" min="0" max="1" value="' + s.sim_cannibal + '"></div>' +
+				'<div class="ce-field"><label>Mínimo de palavras (conteúdo fino)</label><input class="ce-input" id="ce-min-words" type="number" value="' + s.min_words + '"></div>' +
+				'<div class="ce-field"><label>Meses até considerar desatualizado</label><input class="ce-input" id="ce-stale" type="number" value="' + s.stale_months + '"></div>' +
 			'</div>' +
-			// Grupo 2: Credenciais de IA
-			'<div class=”ce-card ce-mt-sm”>' +
-				'<h3 class=”ce-h2”>Credenciais de IA</h3>' +
-				'<p class=”ce-sub”>Suas chaves ficam salvas apenas no seu banco de dados. Se o provedor escolhido não tiver chave, o plugin usa automaticamente outro compatível que tenha.</p>' +
-				'<div class=”ce-field”><label>Provedor principal</label><select class=”ce-select” id=”ce-provider”>' + mainProvOpts() + '</select><p class=”ce-hint”>Usado como padrão e como fallback dos papéis abaixo.</p></div>' +
+			// Grupo 2: Word Counter — análise detalhada de texto no editor
+			'<div class="ce-card ce-mt-sm">' +
+				'<h3 class="ce-h2">Word Counter — análise de texto</h3>' +
+				'<p class="ce-sub">Mostra métricas detalhadas de texto direto no editor: contagem de palavras e caracteres, frases, parágrafos, legibilidade, densidade de palavras-chave e tempo estimado de leitura e de fala. O plugin lê o site e detecta sozinho os tipos de conteúdo (posts e CPTs) onde pode aparecer.</p>' +
+				'<label class="ce-check"><input type="checkbox" id="ce-wordcounter"' + (s.word_counter ? ' checked' : '') + '> Habilitar o Word Counter no editor</label>' +
+			'</div>' +
+			// Grupo 3: Credenciais de IA
+			'<div class="ce-card ce-mt-sm">' +
+				'<h3 class="ce-h2">Credenciais de IA</h3>' +
+				'<p class="ce-sub">Suas chaves ficam salvas apenas no seu banco de dados. Se o provedor escolhido não tiver chave, o plugin usa automaticamente outro compatível que tenha.</p>' +
+				'<div class="ce-field"><label>Provedor principal</label><select class="ce-select" id="ce-provider">' + mainProvOpts() + '</select><p class="ce-hint">Usado como padrão e como fallback dos papéis abaixo.</p></div>' +
 				keyField('anthropic', 'Chave Anthropic') +
 				keyField('openai', 'Chave OpenAI') +
 				keyField('gemini', 'Chave Gemini') +
 				keyField('groq', 'Chave Groq') +
 			'</div>' +
-			// Grupo 3: Comportamento de IA
-			'<div class=”ce-card ce-mt-sm”>' +
-				'<h3 class=”ce-h2”>Comportamento de IA</h3>' +
-				'<p class=”ce-sub”>Escolha qual provedor cuida de cada tipo de tarefa. “Imagens” fica em sincronia com a página Imagens.</p>' +
+			// Grupo 4: Comportamento de IA
+			'<div class="ce-card ce-mt-sm">' +
+				'<h3 class="ce-h2">Comportamento de IA</h3>' +
+				'<p class="ce-sub">Escolha qual provedor cuida de cada tipo de tarefa. “Imagens” fica em sincronia com a página Imagens.</p>' +
 				roleRow('text', 'Reescritas, artigos, FAQ, âncoras e campos de CPT.') +
 				roleRow('analysis', 'Resumos executivos, sugestão/planejamento de clusters e keyword foco.') +
 				roleRow('diagnosis', 'Insight de performance e atualização de posts antigos.') +
 				roleRow('image', 'Provedor de geração de imagem (OpenAI ou Google).') +
-				'<div class=”ce-field”><label>Modelo de texto (opcional)</label><input class=”ce-input” id=”ce-model” value=”' + esc(s.model_light) + '” placeholder=”Vazio = padrão do provedor”><p class=”ce-hint”>Aplica-se à geração de texto no provedor principal.</p></div>' +
-				'<div class=”ce-field”><label>Prompt global do site (identidade)</label>' +
-				'<textarea class=”ce-textarea” id=”ce-global”>' + esc(s.global_prompt) + '</textarea>' +
-				'<p class=”ce-hint”>Injetado como instrução de sistema em toda ação de IA. Aceita variáveis como {{site_name}}.</p></div>' +
+				'<div class="ce-field"><label>Modelo de texto (opcional)</label><input class="ce-input" id="ce-model" value="' + esc(s.model_light) + '" placeholder="Vazio = padrão do provedor"><p class="ce-hint">Aplica-se à geração de texto no provedor principal.</p></div>' +
+				'<div class="ce-field"><label>Prompt global do site (identidade)</label>' +
+				'<textarea class="ce-textarea" id="ce-global">' + esc(s.global_prompt) + '</textarea>' +
+				'<p class="ce-hint">Injetado como instrução de sistema em toda ação de IA. Aceita variáveis como {{site_name}}.</p></div>' +
 			'</div>' +
-			'<p class=”ce-mt-sm”><button class=”ce-btn ce-btn-primary” id=”ce-save-settings”>Salvar configurações</button> ' +
-			'<button class=”ce-btn” id=”ce-test-ai”>⚡ Testar conexão IA</button></p>';
+			'<p class="ce-mt-sm"><button class="ce-btn ce-btn-primary" id="ce-save-settings">Salvar configurações</button> ' +
+			'<button class="ce-btn" id="ce-test-ai">⚡ Testar conexão IA</button></p>';
 
 		$('#ce-test-ai').addEventListener('click', function () {
 			var b = $('#ce-test-ai');
@@ -2942,7 +2948,8 @@
 				sim_weak: $('#ce-sim-weak').value,
 				sim_cannibal: $('#ce-sim-cannibal').value,
 				min_words: $('#ce-min-words').value,
-				stale_months: $('#ce-stale').value
+				stale_months: $('#ce-stale').value,
+				word_counter: $('#ce-wordcounter').checked ? 1 : 0
 			};
 			var roleProv = {};
 			$$('[data-roleprov]', el).forEach(function (sel) {
@@ -2967,6 +2974,7 @@
 				toast('Configurações salvas');
 				CE61.settings.provider = settings.provider;
 				CE61.settings.role_provider = roleProv;
+				CE61.settings.word_counter = !!settings.word_counter;
 				if (settings.image_provider) { CE61.settings.image_provider = settings.image_provider; }
 				aiKeys.forEach(function (p) {
 					if (settings['api_key_' + p] === '__CLEAR__') {

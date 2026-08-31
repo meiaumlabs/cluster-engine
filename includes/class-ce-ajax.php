@@ -262,6 +262,15 @@ class CE61_Ajax {
 	 */
 	public static function report() {
 		self::guard();
+		wp_send_json_success( self::report_data() );
+	}
+
+	/**
+	 * Corpo de cálculo do diagnóstico: monta e RETORNA o array (mesmas chaves
+	 * que o endpoint report() serve). Separado para reuso sem duplicar SQL —
+	 * ex.: o filtro hub61_report_sections consome isto sem tocar no endpoint.
+	 */
+	public static function report_data() {
 		global $wpdb;
 		$p = $wpdb->prefix;
 
@@ -393,7 +402,7 @@ class CE61_Ajax {
 
 		$site_score = $clusters ? (int) $wpdb->get_var( "SELECT ROUND(AVG(score)) FROM {$p}ce_clusters" ) : 0;
 
-		wp_send_json_success( array(
+		return array(
 			'generated_at' => date_i18n( get_option( 'date_format' ) . ' H:i' ),
 			'site_name'    => get_bloginfo( 'name' ),
 			'site_url'     => home_url(),
@@ -403,7 +412,7 @@ class CE61_Ajax {
 			'total_posts'  => (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$p}ce_index" ),
 			'clusters'     => $weak_clusters,
 			'insights'     => $insights,
-		) );
+		);
 	}
 
 	/**
@@ -2936,6 +2945,13 @@ class CE61_Ajax {
 			$cur['image_webp_quality'] = min( 100, max( 40, (int) $in['image_webp_quality'] ) );
 		} elseif ( ! isset( $cur['image_webp_quality'] ) ) {
 			$cur['image_webp_quality'] = 82;
+		}
+		// Word Counter (análise de texto no editor). Só sobrescrito quando a aba
+		// Configurações realmente envia o campo; preserva o valor atual senão.
+		if ( isset( $in['word_counter'] ) ) {
+			$cur['word_counter'] = (bool) $in['word_counter'];
+		} elseif ( ! isset( $cur['word_counter'] ) ) {
+			$cur['word_counter'] = true;
 		}
 		update_option( 'ce61_settings', $cur );
 		CE61_History::ensure_scheduled(); // reagenda o cron diário se o horário mudou.

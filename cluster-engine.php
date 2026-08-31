@@ -3,7 +3,7 @@
  * Plugin Name:       Cluster Engine — Autoridade Tópica & Linkagem Interna
  * Plugin URI:        https://61labs.com.br/cluster-engine
  * Description:       Motor de autoridade tópica: mapeia clusters de conteúdo, palavras-chave, diagnostica SEO/AEO/GEO, sugere e corrige linkagem interna e reescreve metadados com IA. Desenvolvido pela 61 Labs.
- * Version:           2.32.0
+ * Version:           2.34.0
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            61 Labs
@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'CE61_VERSION', '2.32.0' );
+define( 'CE61_VERSION', '2.34.0' );
 define( 'CE61_FILE', __FILE__ );
 define( 'CE61_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CE61_URL', plugin_dir_url( __FILE__ ) );
@@ -81,6 +81,73 @@ require_once CE61_DIR . 'includes/class-ce-changelog.php';
 require_once CE61_DIR . 'includes/class-ce-ajax.php';
 require_once CE61_DIR . 'includes/class-ce-admin.php';
 require_once CE61_DIR . 'includes/class-ce-editor.php';
+require_once CE61_DIR . 'includes/class-ce-wordcounter.php';
+
+/**
+ * Integração com o relatório de performance do Hub 61 Labs (contrato v2).
+ * O Hub aplica o filtro hub61_report_sections ao montar o PDF; devolvemos
+ * uma seção 'cluster-engine' com métricas, gráfico de barras (clusters mais
+ * fracos) e tabelas (ações prioritárias + clusters). Reusa report_data()
+ * para não duplicar SQL. À prova de tabela ausente: se ainda não houve scan,
+ * report_data() volta com listas vazias e a seção sai sem quebrar nada.
+ */
+add_filter( 'hub61_report_sections', function ( array $sections, array $ctx ) {
+	if ( ! class_exists( 'CE61_Ajax' ) || ! method_exists( 'CE61_Ajax', 'report_data' ) ) {
+		return $sections;
+	}
+	try {
+		$d = CE61_Ajax::report_data();
+	} catch ( \Throwable $e ) {
+		return $sections;
+	}
+
+	$clusters = isset( $d['clusters'] ) ? $d['clusters'] : array();
+	$insights = isset( $d['insights'] ) ? $d['insights'] : array();
+	$n_alta   = 0;
+	foreach ( $insights as $i ) {
+		if ( ( $i['priority'] ?? '' ) === 'alta' ) {
+			$n_alta += (int) ( $i['n'] ?? 0 );
+		}
+	}
+
+	$metrics = array(
+		array( 'label' => 'Pontuação do site', 'value' => (string) (int) ( $d['site_score'] ?? 0 ), 'raw' => (int) ( $d['site_score'] ?? 0 ), 'better' => 'up' ),
+		array( 'label' => 'SEO médio', 'value' => (string) (int) ( $d['avg_seo'] ?? 0 ), 'raw' => (int) ( $d['avg_seo'] ?? 0 ), 'better' => 'up' ),
+		array( 'label' => 'AEO médio', 'value' => (string) (int) ( $d['avg_aeo'] ?? 0 ), 'raw' => (int) ( $d['avg_aeo'] ?? 0 ), 'better' => 'up' ),
+		array( 'label' => 'Posts indexados', 'value' => (string) (int) ( $d['total_posts'] ?? 0 ) ),
+		array( 'label' => 'Clusters', 'value' => (string) count( $clusters ) ),
+		array( 'label' => 'Ações prioritárias (alta)', 'value' => (string) $n_alta, 'better' => 'down' ),
+	);
+
+	// Gráfico de barras série única (sem 'previous' → o Hub mostra o valor sobre a barra).
+	$weak      = array_slice( $clusters, 0, 6 ); // report_data() já ordena por score ASC (mais fracos primeiro).
+	$bar_items = array();
+	foreach ( $weak as $c ) {
+		$bar_items[] = array( 'label' => (string) ( $c['name'] ?? '' ), 'current' => (int) ( $c['score'] ?? 0 ) );
+	}
+
+	$prio     = array( 'alta' => 'Alta', 'media' => 'Média', 'aeo' => 'AEO' );
+	$act_rows = array();
+	foreach ( array_slice( $insights, 0, 8 ) as $i ) {
+		$act_rows[] = array( $prio[ $i['priority'] ?? '' ] ?? ( $i['priority'] ?? '' ), (string) ( $i['title'] ?? '' ), (string) (int) ( $i['n'] ?? 0 ) );
+	}
+	$cl_rows = array();
+	foreach ( array_slice( $clusters, 0, 8 ) as $c ) {
+		$cl_rows[] = array( (string) ( $c['name'] ?? '' ), (string) (int) ( $c['score'] ?? 0 ), (string) (int) ( $c['posts'] ?? 0 ) );
+	}
+
+	$sections[] = array(
+		'slug'    => 'cluster-engine',
+		'name'    => 'Cluster Engine',
+		'metrics' => $metrics,
+		'charts'  => $bar_items ? array( array( 'type' => 'bar', 'title' => 'Clusters mais fracos (pontuação)', 'items' => $bar_items ) ) : array(),
+		'tables'  => array(
+			array( 'title' => 'Ações prioritárias', 'columns' => array( 'Prioridade', 'Ação', 'Itens' ), 'rows' => $act_rows ),
+			array( 'title' => 'Clusters mais fracos', 'columns' => array( 'Cluster', 'Pontuação', 'Posts' ), 'rows' => $cl_rows ),
+		),
+	);
+	return $sections;
+}, 10, 2 );
 
 /**
  * Saída do schema nativo (campo _ce61_schema) como JSON-LD no <head>.
@@ -215,6 +282,7 @@ function ce61_activate() {
 	if ( ! get_option( 'ce61_settings' ) ) {
 		add_option( 'ce61_settings', array(
 			'post_types'      => array(), // empty = all public types (resolved at runtime)
+			'word_counter'    => true, // Word Counter (análise de texto) ativo por padrão no editor.
 			'sim_link'        => 0.22, // similarity >= : suggest link.
 			'sim_weak'        => 0.08, // linked pairs below this = senseless link.
 			'sim_cannibal'    => 0.62, // above this + same intent = cannibalization.
@@ -285,4 +353,5 @@ add_action( 'plugins_loaded', function () {
 	CE61_Queue::init();
 	CE61_History::init();
 	CE61_Editor::init();
+	CE61_WordCounter::init();
 } );

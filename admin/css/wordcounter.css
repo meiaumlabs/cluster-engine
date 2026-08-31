@@ -1,0 +1,124 @@
+/* Cluster Engine — Word Counter (meta box de análise de texto no editor). */
+
+:root {
+	--ce-wc-ink: #0a0c10;
+	--ce-wc-ink-2: #50575e;
+	--ce-wc-ink-3: #6c7889;
+	--ce-wc-line: #E2E6EC;
+	--ce-wc-cyan: #56d4cd;
+	--ce-wc-violet: #0b6d62;
+	--ce-wc-soft: #e3f6f3;
+	--ce-wc-softer: #f3fbfa;
+	--ce-wc-green: #2FA36B;
+	--ce-wc-amber: #C77800;
+	--ce-wc-red: #D93843;
+	--ce-wc-radius: 10px;
+}
+
+#ce61-wordcounter-box .inside { margin: 0; padding: 0; }
+
+.ce61-wc { font-size: 12px; color: var(--ce-wc-ink-2); }
+
+.ce61-wc-loading,
+.ce61-wc-empty {
+	margin: 12px;
+	color: var(--ce-wc-ink-3);
+	font-style: italic;
+}
+
+.ce61-wc-sec {
+	padding: 10px 12px;
+	border-top: 1px solid var(--ce-wc-line);
+}
+.ce61-wc-sec:first-child { border-top: 0; }
+
+.ce61-wc-h {
+	margin: 0 0 8px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+	color: var(--ce-wc-violet);
+}
+
+.ce61-wc-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 3px 0;
+}
+.ce61-wc-k { color: var(--ce-wc-ink-2); }
+.ce61-wc-v {
+	font-weight: 700;
+	color: var(--ce-wc-ink);
+	font-variant-numeric: tabular-nums;
+}
+
+/* Legibilidade. */
+.ce61-wc-read {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 6px;
+}
+.ce61-wc-score {
+	font-size: 20px;
+	font-weight: 800;
+	line-height: 1;
+	color: var(--ce-wc-ink);
+	font-variant-numeric: tabular-nums;
+}
+.ce61-wc-read-label { font-weight: 600; }
+
+.ce61-wc-bar {
+	height: 6px;
+	border-radius: 4px;
+	background: var(--ce-wc-line);
+	overflow: hidden;
+}
+.ce61-wc-bar > i {
+	display: block;
+	height: 100%;
+	border-radius: 4px;
+	transition: width .25s ease;
+}
+
+.ce61-wc-vgood { color: var(--ce-wc-green); }
+.ce61-wc-good  { color: var(--ce-wc-violet); }
+.ce61-wc-ok    { color: var(--ce-wc-amber); }
+.ce61-wc-warn  { color: var(--ce-wc-amber); }
+.ce61-wc-bad   { color: var(--ce-wc-red); }
+
+.ce61-wc-bar > i.ce61-wc-vgood { background: var(--ce-wc-green); }
+.ce61-wc-bar > i.ce61-wc-good  { background: var(--ce-wc-cyan); }
+.ce61-wc-bar > i.ce61-wc-ok    { background: var(--ce-wc-amber); }
+.ce61-wc-bar > i.ce61-wc-warn  { background: var(--ce-wc-amber); }
+.ce61-wc-bar > i.ce61-wc-bad   { background: var(--ce-wc-red); }
+
+/* Densidade de palavras-chave. */
+.ce61-wc-kw {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.ce61-wc-kw li {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 4px 8px;
+	margin-bottom: 4px;
+	background: var(--ce-wc-softer);
+	border-radius: var(--ce-wc-radius);
+}
+.ce61-wc-term {
+	color: var(--ce-wc-ink);
+	font-weight: 600;
+	word-break: break-word;
+}
+.ce61-wc-kwmeta {
+	color: var(--ce-wc-ink-3);
+	white-space: nowrap;
+	font-variant-numeric: tabular-nums;
+}

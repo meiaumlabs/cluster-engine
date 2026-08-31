@@ -4,7 +4,7 @@ Tags: seo, internal links, content clusters, topical authority, aeo, geo, eeat, 
 Requires at least: 5.8
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.32.0
+Stable tag: 2.34.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,16 @@ A análise de clusters, keywords, diagnóstico e linkagem funciona 100% sem IA e
 Yoast SEO, Rank Math, All in One SEO e SEOPress são detectados automaticamente. Sem nenhum deles, o Cluster Engine usa campos próprios e os entrega no front-end.
 
 == Changelog ==
+
+= 2.34.0 =
+* Novo: **integração com o relatório de performance do Hub 61 Labs**. O Cluster Engine agora entrega uma seção própria ao PDF consolidado do Hub (filtro `hub61_report_sections`, contrato v2): métricas de Pontuação do site, SEO médio, AEO médio, posts indexados, número de clusters e ações prioritárias de alta severidade; um gráfico de barras com os clusters mais fracos; e tabelas de ações prioritárias e de clusters mais fracos. À prova de site ainda não escaneado — sem dados, a seção sai sem quebrar o relatório.
+* Interno: o cálculo do diagnóstico foi extraído para `CE61_Ajax::report_data()` (retorna o array), reusado pelo endpoint AJAX `report` e pela integração com o Hub sem duplicar consultas. Comportamento do endpoint inalterado.
+
+= 2.33.0 =
+* Novo: **Word Counter — análise detalhada de texto**. Uma meta box no editor mostra, ao vivo enquanto se digita, métricas que vão além da contagem básica: palavras, caracteres (com e sem espaços), frases, parágrafos, média de palavras por frase, tempo estimado de leitura e de fala, índice de legibilidade (escala Flesch adaptada ao PT-BR, com rótulo de Muito fácil a Muito difícil) e densidade de palavras-chave (top termos, unigramas e bigramas, com contagem e percentual). Ferramenta pensada para copywriters, redatores e profissionais de marketing.
+* O Word Counter lê o site e detecta sozinho onde pode aparecer: todos os tipos de conteúdo públicos que suportam o editor — posts, páginas e **CPTs personalizados** — sem lista fixa. Funciona tanto no editor de blocos (Gutenberg) quanto no clássico.
+* Habilitável na aba Configurações (ligado por padrão).
+* Correção: a aba Configurações tinha aspas tipográficas (") no lugar de aspas retas nos atributos de HTML do painel Geral, o que quebrava o estilo e impedia salvar as configurações gerais (escopo de post types, limiares e credenciais). Restaurado.
 
 = 2.32.0 =
 * Identidade visual: reskin completo alinhado à paleta 61labs — tinta profunda (#0a0c10), verde-sinal (#c6f24e) como cor de destaque/CTA e ciano (#56d4cd) no par de assinatura (anel de score, barras de progresso, aba ativa). Botão primário agora usa o padrão da casa (fundo sinal + texto tinta). Superfície clara mantida para legibilidade no wp-admin, com um teal derivado do ciano garantindo contraste AA em links e textos coloridos. Aplicado ao painel, ao editor, ao grafo de rede e ao relatório de performance exportável.
